@@ -21,6 +21,7 @@ Es la primera sesión de desarrollo de este proyecto. Además de las preguntas d
 > - **OAuth con Google** — login con cuenta de Google, allowlist de emails, roles → `/project:oauth`
 > - **reCAPTCHA v3** — protección invisible contra bots en formularios → `/project:recaptcha`
 > - **Bot de Telegram con LLM** — bot que responde en lenguaje natural consultando datos de la app → `/project:telegram`
+> - **Tests E2E con Playwright** — tests end-to-end generados automáticamente para tus entidades → `/project:e2e`
 
 Si el usuario indica que necesita alguno, sugerir integrarlo como parte del plan de la sesión o en una sesión dedicada. Los playbooks están en `docs/playbooks/`.
 

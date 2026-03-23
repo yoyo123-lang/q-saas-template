@@ -36,7 +36,7 @@
     "zod": "^3.25.67"
   },
   "devDependencies": {
-    "typescript-eslint": "^8.37.0",
+    "@playwright/test": "^1.58.2",
     "@tailwindcss/postcss": "^4.2.2",
     "@types/node": "^25.5.0",
     "@types/react": "^19.1.0",
@@ -48,6 +48,7 @@
     "tailwindcss": "^4.2.2",
     "tsx": "^4.21.0",
     "typescript": "^5.9.3",
+    "typescript-eslint": "^8.37.0",
     "vitest": "^4.1.0"
   }
 }

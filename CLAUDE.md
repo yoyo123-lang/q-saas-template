@@ -88,6 +88,7 @@ Si el proyecto tiene hooks configurados → ver `docs/HOOKS.md`. Los hooks corre
 - Para cambios grandes multi-etapa: `/project:cambio-grande`
 - Para correr revisión de roles a demanda: `/project:revision`
 - Para debugging estructurado: `/project:debug`
+- Para generar tests e2e automáticamente: `/project:e2e`
 - Para verificar y pushear a producción: `/project:deploy`
 - Ponerle nombre a cada sesión con `/rename`
 - Referencia para formular pedidos: `docs/COMO_PEDIR.md`

@@ -50,13 +50,6 @@ Ejemplo:
 **Qué hacer en vez**: Usar estrategia JWT en NextAuth y codificar el role en el token (se actualiza al login, no en cada request). Requiere migrar de `PrismaAdapter` database sessions a JWT sessions y manejar invalidación manual. Deuda técnica aceptable para proyectos chicos; revisar al escalar.
 **Archivos afectados**: `src/lib/auth.ts` (session callback)
 
-### 2026-03-23 — middleware.ts deprecado en Next.js 16
-
-**Qué pasó**: Next.js 16 emite warning `"middleware" file convention is deprecated. Please use "proxy" instead` al hacer build.
-**Por qué está mal**: No bloquea el build hoy, pero en futuras versiones de Next.js puede romperse la protección de rutas.
-**Qué hacer en vez**: Migrar `src/middleware.ts` a la convención `proxy` de Next.js 16 cuando la documentación oficial esté estable. Por ahora el archivo funciona normalmente.
-**Archivos afectados**: `src/middleware.ts`
-
 ---
 
 *El CLAUDE.md más efectivo no es el que se escribe una vez: es el que se actualiza cada vez que algo sale mal.*

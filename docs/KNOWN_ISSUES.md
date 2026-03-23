@@ -43,6 +43,13 @@ Ejemplo:
 **Archivos afectados**: Todo lugar donde se parsee JSON de fuentes externas
 -->
 
+### 2026-03-23 — N+1 en session callback de NextAuth
+
+**Qué pasó**: El `session` callback en `src/lib/auth.ts` hace un SELECT a la DB para obtener el `role` del usuario en cada request autenticado.
+**Por qué está mal**: Latencia adicional en cada request. Con tráfico alto se convierte en un cuello de botella.
+**Qué hacer en vez**: Usar estrategia JWT en NextAuth y codificar el role en el token (se actualiza al login, no en cada request). Requiere migrar de `PrismaAdapter` database sessions a JWT sessions y manejar invalidación manual. Deuda técnica aceptable para proyectos chicos; revisar al escalar.
+**Archivos afectados**: `src/lib/auth.ts` (session callback)
+
 ### 2026-03-23 — middleware.ts deprecado en Next.js 16
 
 **Qué pasó**: Next.js 16 emite warning `"middleware" file convention is deprecated. Please use "proxy" instead` al hacer build.

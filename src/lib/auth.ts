@@ -35,4 +35,18 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       return session;
     },
   },
+  events: {
+    async createUser({ user }) {
+      // Si el usuario recién creado es el admin configurado, promoverlo a ADMIN
+      if (!user.email || user.email !== process.env.ADMIN_EMAIL) return;
+      try {
+        await prisma.user.update({
+          where: { id: user.id },
+          data: { role: "ADMIN" },
+        });
+      } catch (err) {
+        console.error("[auth] Error al promover admin en primer login:", err);
+      }
+    },
+  },
 });

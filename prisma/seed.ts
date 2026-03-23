@@ -10,20 +10,34 @@ async function main() {
     process.exit(1);
   }
 
-  const existing = await prisma.allowedEmail.findUnique({
+  // Asegurar que el email esté en la allowlist
+  await prisma.allowedEmail.upsert({
     where: { email: adminEmail },
+    update: {},
+    create: { email: adminEmail },
   });
 
-  if (existing) {
-    console.log(`El email ${adminEmail} ya está en la allowlist.`);
-    return;
+  console.log(`Email ${adminEmail} en allowlist.`);
+
+  // Si el usuario ya existe en DB (ya se logueó antes), promoverlo a ADMIN
+  const existingUser = await prisma.user.findUnique({
+    where: { email: adminEmail },
+    select: { id: true, role: true },
+  });
+
+  if (existingUser) {
+    if (existingUser.role !== "ADMIN") {
+      await prisma.user.update({
+        where: { email: adminEmail },
+        data: { role: "ADMIN" },
+      });
+      console.log(`Usuario ${adminEmail} promovido a ADMIN.`);
+    } else {
+      console.log(`Usuario ${adminEmail} ya es ADMIN.`);
+    }
+  } else {
+    console.log(`Usuario ${adminEmail} recibirá rol ADMIN en su primer login.`);
   }
-
-  await prisma.allowedEmail.create({
-    data: { email: adminEmail },
-  });
-
-  console.log(`Email ${adminEmail} agregado a la allowlist como admin.`);
 }
 
 main()

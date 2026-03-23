@@ -1,140 +1,147 @@
-# Sistema de Reglas para Vibecoding con Claude Code
+# Q SaaS Template
 
-> Plantilla de documentación para operar proyectos con estandar senior usando Claude Code como herramienta principal de desarrollo.
+> Template funcional que combina el sistema de reglas de templete-blanco con código base deployable para SaaS.
 
-## Manual de uso
+## Qué incluye
 
-Si es tu primera vez con este template → **leé `docs/MANUAL_DE_USO.md`**. Es la guía práctica de operación diaria.
+### Código funcional
 
-## Que incluye
+- **Auth completa**: Google OAuth con NextAuth v5, allowlist de emails, roles (ADMIN/USER), middleware de protección
+- **Dashboard**: Layout con sidebar responsive, header con usuario, breadcrumbs
+- **CRUD de ejemplo**: Modelo "Project" con 5 endpoints REST, validación Zod, soft delete, paginación por cursor
+- **Componentes UI**: LoadingState, EmptyState, ErrorState, ConfirmDialog, DataTable, StatusBadge
+- **Landing pública**: Hero, features, CTA
+- **Health check**: `/api/health` con estado de DB
+- **SEO**: Metadata dinámica, robots.txt, sitemap.xml
+- **Tests**: Unitarios (Zod) + integración (endpoints)
 
-### Nucleo
+### Sistema de reglas (templete-blanco)
 
-- `CLAUDE.md` — Reglas que Claude Code carga automaticamente al iniciar sesion
-- `docs/REGLAS_PREVENTIVAS.md` — Reglas preventivas destiladas de los 6 roles de auditoria
-- `docs/COMO_PEDIR.md` — Guia personal para formular pedidos a Claude Code
+- 13 comandos de proyecto (skills)
+- 4 sub-agentes (explorador, implementador, micro-revisor, revisor)
+- 9+ roles de auditoría
+- Documentación modular completa
 
-### Skills (comandos de proyecto)
+## Stack
 
-| Comando | Que hace |
+| Componente | Tecnología |
 |---|---|
-| `/project:sesion` | Mini-onboarding al arrancar sesion |
-| `/project:cierre` | Cierre ordenado de sesion |
-| `/project:cambio` | Cambio puntual con revision automatica |
-| `/project:cambio-grande` | Cambio multi-etapa con revision por etapa |
+| Framework | Next.js 16 (App Router) |
+| Lenguaje | TypeScript (strict) |
+| Estilos | Tailwind CSS 4 |
+| Base de datos | Supabase (PostgreSQL) |
+| ORM | Prisma 6 |
+| Auth | NextAuth v5 + Google OAuth |
+| Validación | Zod 4 |
+| Deploy | Vercel |
+
+## Setup en 5 minutos
+
+### 1. Clonar y configurar
+
+```bash
+gh repo create mi-producto --template q-saas-template --private
+cd mi-producto
+cp .env.example .env.local
+```
+
+### 2. Completar variables de entorno
+
+Editar `.env.local` con:
+- `DATABASE_URL` y `DIRECT_URL` de Supabase
+- `NEXTAUTH_SECRET` (generar con `openssl rand -base64 32`)
+- `GOOGLE_CLIENT_ID` y `GOOGLE_CLIENT_SECRET` de Google Cloud Console
+- `ADMIN_EMAIL` para el seed
+
+### 3. Base de datos
+
+```bash
+npm install
+npx prisma db push
+npm run db:seed
+```
+
+### 4. Desarrollo
+
+```bash
+npm run dev
+```
+
+### 5. Personalizar
+
+```bash
+# Llenar BLUEPRINT.md con los datos del producto
+# Abrir Claude Code
+claude
+# Correr el onboarding
+/project:sesion
+```
+
+## Cómo arrancar un proyecto nuevo
+
+1. Clonar este template
+2. Llenar `BLUEPRINT.md` con los datos del producto
+3. Correr `/project:sesion` en Claude Code
+4. Claude Code transforma el esqueleto: renombra modelos, crea entidades, aplica diseño
+5. Correr `/project:cierre` al terminar
+
+**Tiempo estimado**: 30-60 minutos (vs. 4-8 horas desde cero)
+
+## Qué NO incluye (usar playbooks)
+
+- Pasarelas de pago → playbook específico por pasarela
+- Bot de Telegram → `/project:telegram`
+- reCAPTCHA → `/project:recaptcha`
+- Notificaciones, i18n, emails transaccionales, analytics
+
+## Comandos
+
+| Comando | Qué hace |
+|---|---|
+| `npm run dev` | Levantar en desarrollo |
+| `npm run build` | Build de producción |
+| `npm run lint` | Lint con ESLint |
+| `npm run test` | Correr tests |
+| `npm run db:generate` | Regenerar Prisma client |
+| `npm run db:push` | Push schema a DB |
+| `npm run db:seed` | Seed de admin |
+
+## Skills de Claude Code
+
+| Comando | Qué hace |
+|---|---|
+| `/project:sesion` | Mini-onboarding al arrancar sesión |
+| `/project:cierre` | Cierre ordenado de sesión |
+| `/project:cambio` | Cambio puntual con revisión automática |
+| `/project:cambio-grande` | Cambio multi-etapa con revisión por etapa |
 | `/project:diseño` | Contexto visual para crear/mejorar pantallas |
-| `/project:debug` | Debugging estructurado con hipotesis y TDD |
-| `/project:revision` | Auditoria de roles a demanda |
-| `/project:deploy` | Verificacion pre-deploy y push |
-| `/project:onboard` | Adoptar template en proyecto existente |
-| `/project:descubrimiento` | Documentar modelo de negocio |
-| `/project:oauth` | Integracion OAuth con Google |
-| `/project:recaptcha` | Integracion reCAPTCHA v3 |
+| `/project:debug` | Debugging estructurado |
+| `/project:deploy` | Verificación pre-deploy y push |
+| `/project:oauth` | Integración OAuth con Google |
+| `/project:recaptcha` | Integración reCAPTCHA v3 |
 | `/project:telegram` | Bot de Telegram con LLM |
 
-### Sub-agentes
-
-| Agente | Modelo | Permisos | Uso |
-|---|---|---|---|
-| `explorador` | Sonnet | Solo lectura | Investigar el codebase |
-| `implementador` | Sonnet | Edicion + bash | Escribir codigo siguiendo reglas preventivas + TDD |
-| `micro-revisor` | Haiku | Solo lectura | Verificacion rapida post-tarea (spec + calidad) |
-| `revisor` | Opus | Solo lectura | Revision completa post-etapa |
-
-### Documentacion del proyecto
-
-- `docs/ARCHITECTURE.md` — Arquitectura y stack tecnologico
-- `docs/CONVENTIONS.md` — Convenciones de codigo
-- `docs/DEBUGGING.md` — Prevencion de errores silenciosos
-- `docs/TESTING.md` — Estrategia de testing por capas
-- `docs/TDD.md` — Proceso de Test-Driven Development (Red-Green-Refactor)
-- `docs/SECURITY.md` — Reglas minimas de seguridad
-- `docs/PLANNING.md` — Metodologia de planificacion
-- `docs/GIT-WORKFLOW.md` — Branching, commits, PRs
-- `docs/GIT-WORKTREES.md` — Desarrollo aislado con git worktrees
-- `docs/HOOKS.md` — Verificacion automatica con hooks
-- `docs/MULTI-AGENT.md` — Trabajo paralelo, sesiones, sub-agentes custom
-- `docs/DEPLOYMENT.md` — Ambientes y proceso de deploy
-- `docs/OPERATIONS.md` — Monitoreo, alertas, incidentes
-- `docs/MAINTENANCE.md` — Salud del codigo y deuda tecnica
-- `docs/PERFORMANCE.md` — Optimizacion y umbrales
-- `docs/KNOWN_ISSUES.md` — Errores conocidos y aprendizajes
-- `docs/PRE_DEPLOY_AND_QA.md` — Build obligatorio y QA funcional
-- `docs/API_STANDARDS.md` — Contratos REST y webhooks
-- `docs/DATABASE.md` — Modelo, migraciones, backups
-- `docs/I18N.md` — Internacionalizacion y localizacion
-- `docs/FRONTEND_GUIDELINES.md` — Accesibilidad, responsive, estados de UI
-- `docs/PR_TEMPLATE.md` — Template para pull requests
-- `docs/AI_CODE_REVIEW.md` — Auditoria de codigo con IA
-- `docs/ADOPCION_PROYECTOS_EXISTENTES.md` — Adopcion de proyectos con deuda tecnica
-- `docs/CHECKLIST_SENIOR_AUDIT.md` — Scorecard de auditoria del template
-
-### Roles de auditoria
-
-- `docs/roles/REVIEW_ROLES.md` — Framework de revision multi-rol
-
-#### Capa 1: Roles técnicos (`docs/roles/tech/`)
-- `code-reviewer.md` — Calidad y mantenibilidad
-- `qa-engineer.md` — Robustez y casos borde
-- `security-auditor.md` — Vulnerabilidades y acceso
-- `security-audit-post-sprint.md` — Auditoria profunda post-sprint con IA
-- `security-scan-quick.md` — Scan rapido pre-deploy
-- `performance-engineer.md` — Bottlenecks y escalabilidad
-- `devops-sre.md` — Operabilidad y recuperacion
-- `ux-reviewer.md` — Interaccion, consistencia visual, accesibilidad
-
-#### Capa 2: Roles de negocio (`docs/roles/business/`)
-- `product-reviewer.md` — UX, SEO, producto
-- `business-logic-reviewer.md` — Reglas de negocio, billing, permisos
-- `data-analytics-reviewer.md` — Tracking, metricas, funnel
-
-### Onboarding y playbooks
-
-- `docs/onboarding/guia_onboarding.md` — Brainstorming de proyecto nuevo con Claude
-- `docs/onboarding/playbook-micrositios-utilidad.md` — Redes de micrositios de utilidad
-- `docs/onboarding/playbook-negocios-digitales-exterior.md` — Negocios digitales probados afuera
-
-### Decisiones de arquitectura
-
-- `docs/decisions/ADR-TEMPLATE.md` — Template para ADRs
-- `docs/decisions/ADR-0001-sistema-documentacion-modular.md` — Por que la documentacion es modular
-
-### Referencia
-
-- `docs/referencia/security-rules-claudemd.md` — Razonamiento detras de las reglas de seguridad (OWASP, OpenSSF)
-
-## Flujo recomendado de uso
-
-### Si arrancas desde cero
+## Estructura
 
 ```
-ANTES DE ARRANCAR:
-→ Mirar docs/COMO_PEDIR.md (machete de templates para prompts)
-→ Si la idea no esta clara → charlarla en Claude.ai primero
-
-AL ARRANCAR SESION:
-→ /project:sesion (mini-onboarding)
-
-DURANTE EL DESARROLLO:
-→ Claude usa sub-agentes automaticamente:
-  - explorador para investigar
-  - implementador para codear (con REGLAS_PREVENTIVAS cargadas)
-  - revisor para chequear antes de commit
-→ Si necesitas una pantalla → /project:diseño
-
-AL TERMINAR:
-→ /project:cierre (actualiza SESSION_LOG, evalua KNOWN_ISSUES, verifica build)
-
-ANTES DE DEPLOY:
-→ Auditorias formales de docs/roles/
+src/
+├── app/
+│   ├── layout.tsx              # Layout raíz con providers
+│   ├── page.tsx                # Landing pública
+│   ├── login/                  # Login con Google
+│   ├── unauthorized/           # Acceso denegado
+│   ├── dashboard/              # Rutas protegidas
+│   │   ├── layout.tsx          # Sidebar + header
+│   │   ├── page.tsx            # Dashboard home
+│   │   └── projects/           # CRUD de ejemplo
+│   └── api/
+│       ├── auth/               # NextAuth handler
+│       ├── health/             # Health check
+│       └── v1/projects/        # REST endpoints
+├── components/
+│   ├── layout/                 # Sidebar, header, breadcrumbs
+│   └── shared/                 # Componentes reutilizables
+├── lib/                        # Auth, DB, validaciones, helpers
+├── hooks/                      # React hooks custom
+└── types/                      # TypeScript types
 ```
-
-### Si el proyecto ya existe
-
-1. `/project:onboard` — detecta stack, diagnostica y completa documentacion base
-2. `/project:descubrimiento` — documenta modelo de negocio (activa roles de capa 2)
-3. Avanzar con normalizacion de codigo usando `/project:cambio` o `/project:cambio-grande`
-
-## Estado de la plantilla
-
-Esta base cubre los dominios del checklist senior, pero sigue siendo una **plantilla**: cada proyecto debe completar valores concretos (versiones, URLs, owners, umbrales, comandos reales).

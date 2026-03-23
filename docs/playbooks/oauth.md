@@ -317,7 +317,7 @@ npm install next-auth@beta @auth/prisma-adapter
 ## Deuda técnica conocida
 
 - Las Server Actions deben verificar sesión y rol internamente (no solo depender del layout).
-- `session.user.role` requiere casteo explícito — resolver con augmentación de tipos de NextAuth.
+- `session.user.role` requiere augmentación de tipos de NextAuth — resuelto en el template con `src/types/next-auth.d.ts`.
 
 ---
 

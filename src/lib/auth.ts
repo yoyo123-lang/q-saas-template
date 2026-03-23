@@ -26,11 +26,13 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     async session({ session, user }) {
       if (session.user) {
         session.user.id = user.id;
+        // Query por PK para inyectar rol en sesión. Costo: 1 query/request autenticado.
+        // Tradeoff aceptado — ver docs/KNOWN_ISSUES.md para alternativa JWT.
         const dbUser = await prisma.user.findUnique({
           where: { id: user.id },
           select: { role: true },
         });
-        (session.user as { role?: string }).role = dbUser?.role ?? "USER";
+        session.user.role = dbUser?.role ?? "USER";
       }
       return session;
     },

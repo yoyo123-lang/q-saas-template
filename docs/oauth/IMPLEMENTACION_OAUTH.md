@@ -1,7 +1,7 @@
 # Implementación de OAuth con NextAuth.js v5
 
 > Documentación técnica de la implementación de autenticación Google OAuth en este proyecto.
-> Pensada para reutilizar en proyectos nuevos con el mismo stack: **Next.js 15 + NextAuth v5 + Prisma + PostgreSQL + Railway**.
+> Pensada para reutilizar en proyectos nuevos con el mismo stack: **Next.js 15 + NextAuth v5 + Prisma + PostgreSQL + Vercel**.
 
 ---
 
@@ -13,7 +13,7 @@
 | Auth | NextAuth.js v5 (beta) — `next-auth@5` |
 | Provider | Google OAuth 2.0 |
 | Persistencia de sesión | PrismaAdapter → PostgreSQL |
-| Deploy | Railway |
+| Deploy | Vercel |
 
 ---
 
@@ -37,7 +37,7 @@ Usuario → /login → Server Action → signIn("google") → Google OAuth
 **Dos capas de protección:**
 
 1. **Middleware** (`src/middleware.ts`): chequea que exista cookie de sesión. Es rápido, no toca DB.
-2. **Layout admin** (`src/app/(admin)/layout.tsx`): llama `auth()`, verifica que `role === "ADMIN"`. Toca DB.
+2. **Layout protegido** (`src/app/dashboard/layout.tsx`): llama `auth()`, verifica sesión válida. Toca DB. La verificación de rol se hace en API routes (`requireAdmin()`) o layouts específicos.
 
 ---
 
@@ -93,7 +93,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
             where: { id: user.id },
             select: { role: true },
           });
-          (session.user as { role?: string }).role = dbUser?.role ?? "EMPLOYEE";
+          (session.user as { role?: string }).role = dbUser?.role ?? "USER";
         }
       } catch (err) {
         console.error("[auth] session callback ERROR:", err);
@@ -104,7 +104,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
 });
 ```
 
-**Por qué `trustHost: true`:** En Railway el dominio es dinámico. Sin esto, NextAuth rechaza requests porque no puede verificar el host.
+**Por qué `trustHost: true`:** En hosts con dominio dinámico (Vercel preview deployments, Railway, etc.), NextAuth rechaza requests si no puede verificar el host. `trustHost: true` evita eso.
 
 **Por qué PrismaAdapter (sesiones en DB) y no JWT:** Permite invalidar sesiones desde el servidor, consultar `role` real desde la DB en cada request, y tener auditoría completa de sesiones activas.
 
@@ -266,7 +266,7 @@ Estas tablas las requiere **PrismaAdapter**. Si no existen, NextAuth falla silen
 // Enum de roles (adaptar según el proyecto)
 enum Role {
   ADMIN
-  EMPLOYEE
+  USER
 }
 
 // Tabla de usuarios — extendida con campos propios
@@ -276,7 +276,7 @@ model User {
   email         String?   @unique
   emailVerified DateTime?
   image         String?
-  role          Role      @default(EMPLOYEE)
+  role          Role      @default(USER)
   // campos propios del proyecto...
   accounts      Account[]
   sessions      Session[]
@@ -354,7 +354,7 @@ INSERT INTO "AllowedEmail" ("id", "email", "createdAt")
 VALUES (gen_random_uuid()::text, 'admin@ejemplo.com', now())
 ON CONFLICT ("email") DO NOTHING;
 
--- Asegura que el usuario tenga rol ADMIN (workaround: NextAuth crea usuarios con EMPLOYEE por default)
+-- Asegura que el usuario tenga rol ADMIN (workaround: NextAuth crea usuarios con USER por default)
 UPDATE "User" SET "role" = 'ADMIN'
 WHERE "email" = 'admin@ejemplo.com';
 ```
@@ -379,7 +379,7 @@ Versión usada en este proyecto: `next-auth@5.0.0-beta.*`
 |---|---|---|
 | Server Actions en `actions.ts` no verifican sesión ni rol — solo el layout protege | CRÍTICO | Pendiente |
 | Email del admin hardcodeado en `startup.mjs` | MEDIO | Aceptado (bootstrap) |
-| `session.user.role` requiere casteo explícito de tipos | BAJO | Pendiente (augmentación de tipos NextAuth) |
+| `session.user.role` requiere casteo explícito de tipos | BAJO | Resuelto (`src/types/next-auth.d.ts`) |
 
 Ver `docs/KNOWN_ISSUES.md` y `docs/reviews/2026-03-09_security.md` para más contexto.
 

@@ -43,11 +43,15 @@ Ejemplo:
 **Archivos afectados**: Todo lugar donde se parsee JSON de fuentes externas
 -->
 
-### 2026-03-23 — N+1 en session callback de NextAuth
+### 2026-03-23 — Query a DB en cada session callback de NextAuth
 
-**Qué pasó**: El `session` callback en `src/lib/auth.ts` hace un SELECT a la DB para obtener el `role` del usuario en cada request autenticado.
-**Por qué está mal**: Latencia adicional en cada request. Con tráfico alto se convierte en un cuello de botella.
-**Qué hacer en vez**: Usar estrategia JWT en NextAuth y codificar el role en el token (se actualiza al login, no en cada request). Requiere migrar de `PrismaAdapter` database sessions a JWT sessions y manejar invalidación manual. Deuda técnica aceptable para proyectos chicos; revisar al escalar.
+**Qué pasó**: El `session` callback en `src/lib/auth.ts` hace `prisma.user.findUnique({ select: { role: true } })` en cada request autenticado para inyectar el rol en la sesión.
+**Por qué está mal**: Agrega una query por request autenticado. Con tráfico alto o DB con latencia, se convierte en cuello de botella.
+**Tradeoff aceptado**: Se mantiene porque:
+- Es una query simple por PK (`id`) con `select: { role: true }` — es la query más rápida posible.
+- La alternativa (JWT strategy) requiere: migrar de sesiones en DB a JWT, manejar invalidación manual cuando cambia el rol, y perder la capacidad de invalidar sesiones server-side. Esa complejidad no se justifica para el volumen esperado del template.
+- Si un proyecto derivado necesita escalar, la migración a JWT strategy es el camino. Documentar en ese momento.
+**Qué hacer si escala**: Migrar a `strategy: "jwt"`, codificar el role en el token JWT (se actualiza solo al login), y agregar lógica de invalidación cuando el rol cambie.
 **Archivos afectados**: `src/lib/auth.ts` (session callback)
 
 ---

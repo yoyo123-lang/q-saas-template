@@ -18,12 +18,15 @@
 
 | Variable | Local | Staging | Prod | Descripción |
 |---|---|---|---|---|
-| APP_ENV | dev | staging | production | Ambiente activo |
-| APP_PORT | ✅ | ✅ | ✅ | Puerto de app |
-| DATABASE_URL | ✅ | ✅ | ✅ | Conexión DB |
-| REDIS_URL | opcional | recomendado | recomendado | Cache/colas |
-| JWT_SECRET | ✅ | ✅ | ✅ | Firma de tokens |
-| LOG_LEVEL | debug | info | info/warn | Nivel de logs |
+| DATABASE_URL | ✅ | ✅ | ✅ | Conexión DB (Supabase PostgreSQL) |
+| DIRECT_URL | ✅ | ✅ | ✅ | Conexión directa (migraciones Prisma) |
+| NEXTAUTH_URL | ✅ | auto (Vercel) | auto (Vercel) | URL base de la app |
+| NEXTAUTH_SECRET | ✅ | ✅ | ✅ | Firma de sesiones NextAuth |
+| GOOGLE_CLIENT_ID | ✅ | ✅ | ✅ | OAuth client ID |
+| GOOGLE_CLIENT_SECRET | ✅ | ✅ | ✅ | OAuth client secret |
+| ADMIN_EMAIL | ✅ | ✅ | ✅ | Email del admin (seed + auto-promoción) |
+
+> **Nota:** Esta tabla refleja las variables reales del template. Verificar contra `.env.example` como fuente de verdad. Proyectos derivados pueden agregar variables propias (APP_ENV, LOG_LEVEL, REDIS_URL, etc.).
 
 ## 3) Checklist pre-deploy
 

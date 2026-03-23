@@ -1,6 +1,12 @@
 import { signIn } from "@/lib/auth";
 
-export default function LoginPage() {
+export default async function LoginPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ error?: string }>;
+}) {
+  const { error } = await searchParams;
+
   return (
     <main className="flex min-h-screen items-center justify-center bg-gray-50">
       <div className="w-full max-w-sm rounded-lg border border-gray-200 bg-white p-8 shadow-sm">
@@ -10,6 +16,13 @@ export default function LoginPage() {
         <p className="mb-6 text-center text-sm text-gray-500">
           Ingresá con tu cuenta de Google para continuar.
         </p>
+        {error && (
+          <div className="mb-4 rounded-md bg-red-50 p-3 text-center text-sm text-red-700">
+            {error === "AccessDenied"
+              ? "Tu cuenta no tiene acceso. Contactá al administrador."
+              : "Ocurrió un error al iniciar sesión. Intentá de nuevo."}
+          </div>
+        )}
         <form
           action={async () => {
             "use server";

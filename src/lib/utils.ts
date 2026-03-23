@@ -23,3 +23,8 @@ export function formatNumber(value: number, decimals = 2): string {
     maximumFractionDigits: decimals,
   });
 }
+
+/** Formatea un monto en pesos argentinos ($ 1.000,50) */
+export function formatCurrency(value: number, decimals = 2): string {
+  return `$ ${formatNumber(value, decimals)}`;
+}

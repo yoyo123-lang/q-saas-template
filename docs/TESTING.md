@@ -102,4 +102,26 @@ Cuando un proyecto derivado necesite más confianza, agregar en este orden:
 
 1. **Smoke test de health endpoint** — Un test que levante la app y haga `GET /api/health`. Valida que el build funciona y la DB conecta. Mínimo esfuerzo, máximo valor como gate de CI.
 2. **Tests de integración real con DB de test** — Usar una DB PostgreSQL de test (Docker o Supabase local) para validar queries Prisma reales. Priorizar endpoints con lógica compleja.
-3. **E2e mínimo** — Un flujo de login → dashboard → CRUD con Playwright. Solo cuando haya flujos de usuario que justifiquen el costo de mantener la suite.
+3. **E2e con Playwright** — Flujos de usuario completos (login → dashboard → CRUD). Usar `/project:e2e` para generar tests automáticamente.
+
+## 10) Sistema E2E generativo
+
+El template incluye un sistema completo para generar tests e2e de forma incremental:
+
+| Pieza | Ubicación | Qué hace |
+|---|---|---|
+| Playbook técnico | `docs/playbooks/e2e.md` | Patrones reutilizables por tipo (CRUD, form, ruta protegida, flujo multi-paso) |
+| Command interactivo | `/project:e2e` | Proceso guiado: detecta entidades, genera tests, los ejecuta |
+| Infraestructura base | `playwright.config.ts`, `tests/e2e/fixtures/auth.ts` | Config + fixture de auth con sesión sintética en DB |
+| CI workflow | `.github/workflows/e2e.yml` | Corre tests automáticamente en cada PR |
+
+### Niveles incrementales
+
+| Nivel | Qué cubre | Archivos |
+|---|---|---|
+| 0. Smoke | Health endpoint, páginas públicas, redirect sin auth | `tests/e2e/smoke.spec.ts` |
+| 1. Auth | Sesión sintética funciona, dashboard carga | `tests/e2e/auth.spec.ts` |
+| 2. CRUD | Crear → listar → editar → eliminar por entidad | `tests/e2e/[entidad].spec.ts` |
+| 3. Flujos | Multi-paso, permisos por rol, estados | `tests/e2e/[flujo].spec.ts` |
+
+Para adoptar e2e en un proyecto (nuevo o existente): correr `/project:e2e`.

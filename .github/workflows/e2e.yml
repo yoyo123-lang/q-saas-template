@@ -1,0 +1,87 @@
+name: E2E Tests
+
+on:
+  pull_request:
+    branches: [main]
+  # Permitir ejecución manual
+  workflow_dispatch:
+
+env:
+  # Variables mínimas para que la app arranque
+  NEXTAUTH_SECRET: "ci-test-secret-not-for-production"
+  NEXTAUTH_URL: "http://localhost:3000"
+  # En CI se necesita una DB real — configurar en GitHub Secrets
+  DATABASE_URL: ${{ secrets.DATABASE_URL }}
+  # Dummy values — el auth real no se usa en e2e (usamos sesión sintética)
+  GOOGLE_CLIENT_ID: "dummy-for-ci"
+  GOOGLE_CLIENT_SECRET: "dummy-for-ci"
+  ADMIN_EMAIL: "admin@test.local"
+
+jobs:
+  e2e:
+    name: Playwright Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright browsers
+        run: npx playwright install chromium --with-deps
+
+      - name: Generate Prisma client
+        run: npx prisma generate
+
+      - name: Build app
+        run: npm run build
+
+      - name: Run E2E tests
+        run: npx playwright test
+        env:
+          CI: true
+          # El standalone server se arranca automáticamente
+          # Si usás Vercel preview URL, descomentar la línea siguiente
+          # y comentar el webServer en playwright.config.ts
+          # PLAYWRIGHT_BASE_URL: ${{ steps.vercel.outputs.preview-url }}
+
+      - name: Upload Playwright report
+        uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 7
+
+# ─────────────────────────────────────────────────────────
+# ALTERNATIVA: Correr contra Vercel preview URL
+# ─────────────────────────────────────────────────────────
+# Si preferís testear contra el deploy real de Vercel en lugar
+# de un server local en CI, reemplazá los steps de build y test
+# con esto:
+#
+#   - name: Wait for Vercel deploy
+#     uses: patrickedqvist/wait-for-vercel-preview@v1.3.2
+#     id: vercel
+#     with:
+#       token: ${{ secrets.GITHUB_TOKEN }}
+#       max_timeout: 300
+#
+#   - name: Run E2E tests against preview
+#     run: npx playwright test
+#     env:
+#       CI: true
+#       PLAYWRIGHT_BASE_URL: ${{ steps.vercel.outputs.url }}
+#
+# Con esta alternativa no necesitás DATABASE_URL en CI porque
+# la preview de Vercel usa su propia DB.
+# ─────────────────────────────────────────────────────────

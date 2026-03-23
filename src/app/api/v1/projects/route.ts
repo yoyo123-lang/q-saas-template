@@ -1,9 +1,11 @@
 import { NextRequest } from "next/server";
+import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { requireAuth } from "@/lib/require-admin";
 import { apiSuccess, validationError, internalError } from "@/lib/api-response";
 import { createProjectSchema } from "@/lib/validations/project";
-import type { ProjectStatus } from "@prisma/client";
+
+const statusSchema = z.enum(["ACTIVE", "PAUSED", "COMPLETED", "ARCHIVED"]).optional();
 
 /** GET /api/v1/projects — Listar proyectos del usuario autenticado */
 export async function GET(request: NextRequest) {
@@ -12,8 +14,9 @@ export async function GET(request: NextRequest) {
 
   try {
     const { searchParams } = request.nextUrl;
-    const status = searchParams.get("status") as ProjectStatus | null;
-    const limit = Math.min(Number(searchParams.get("limit")) || 25, 100);
+    const statusParsed = statusSchema.safeParse(searchParams.get("status") ?? undefined);
+    const status = statusParsed.success ? (statusParsed.data ?? null) : null;
+    const limit = Math.max(1, Math.min(Number(searchParams.get("limit")) || 25, 100));
     const cursor = searchParams.get("cursor");
 
     const projects = await prisma.project.findMany({

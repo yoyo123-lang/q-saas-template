@@ -101,8 +101,17 @@ export default function ProjectDetailPage({
   }
 
   async function handleDelete() {
-    await fetch(`/api/v1/projects/${id}`, { method: "DELETE" });
-    router.push("/dashboard/projects");
+    try {
+      const res = await fetch(`/api/v1/projects/${id}`, { method: "DELETE" });
+      const json = await res.json();
+      if (!json.success) {
+        console.error("Error al eliminar proyecto:", json.error?.message);
+        return;
+      }
+      router.push("/dashboard/projects");
+    } catch {
+      console.error("Error de conexión al eliminar proyecto");
+    }
   }
 
   if (isLoading) return <LoadingState message="Cargando proyecto..." />;

@@ -15,6 +15,7 @@ type RouteContext = { params: Promise<{ id: string }> };
 async function findOwnedProject(id: string, userId: string) {
   return prisma.project.findFirst({
     where: { id, userId, deletedAt: null },
+    select: { id: true },
   });
 }
 
@@ -58,7 +59,7 @@ export async function PUT(request: NextRequest, context: RouteContext) {
     }
 
     const updated = await prisma.project.update({
-      where: { id },
+      where: { id, userId: userId! },
       data: parsed.data,
     });
 
@@ -80,7 +81,7 @@ export async function DELETE(_request: NextRequest, context: RouteContext) {
     if (!existing) return notFoundError("Proyecto no encontrado");
 
     await prisma.project.update({
-      where: { id },
+      where: { id, userId: userId! },
       data: { deletedAt: new Date() },
     });
 

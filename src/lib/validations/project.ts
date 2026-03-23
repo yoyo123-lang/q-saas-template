@@ -3,6 +3,7 @@ import { z } from "zod";
 export const createProjectSchema = z.object({
   name: z
     .string()
+    .trim()
     .min(1, "El nombre es obligatorio")
     .max(100, "El nombre no puede superar los 100 caracteres"),
   description: z
@@ -15,6 +16,7 @@ export const createProjectSchema = z.object({
 export const updateProjectSchema = z.object({
   name: z
     .string()
+    .trim()
     .min(1, "El nombre es obligatorio")
     .max(100, "El nombre no puede superar los 100 caracteres")
     .optional(),

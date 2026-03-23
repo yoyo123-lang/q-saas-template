@@ -28,6 +28,11 @@ describe("createProjectSchema", () => {
     expect(result.success).toBe(false);
   });
 
+  it("rechaza nombre con solo espacios", () => {
+    const result = createProjectSchema.safeParse({ name: "   " });
+    expect(result.success).toBe(false);
+  });
+
   it("rechaza sin nombre", () => {
     const result = createProjectSchema.safeParse({});
     expect(result.success).toBe(false);

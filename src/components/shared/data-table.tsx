@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { ChevronLeft, ChevronRight, ArrowUpDown } from "lucide-react";
 
 export interface Column<T> {
@@ -39,14 +39,16 @@ export function DataTable<T>({
     setPage(0);
   }
 
-  const sorted = [...data].sort((a, b) => {
-    if (!sortKey) return 0;
-    const aVal = (a as Record<string, unknown>)[sortKey];
-    const bVal = (b as Record<string, unknown>)[sortKey];
-    if (aVal == null || bVal == null) return 0;
-    const cmp = String(aVal).localeCompare(String(bVal));
-    return sortDir === "asc" ? cmp : -cmp;
-  });
+  const sorted = useMemo(() => {
+    if (!sortKey) return data;
+    return [...data].sort((a, b) => {
+      const aVal = (a as Record<string, unknown>)[sortKey];
+      const bVal = (b as Record<string, unknown>)[sortKey];
+      if (aVal == null || bVal == null) return 0;
+      const cmp = String(aVal).localeCompare(String(bVal));
+      return sortDir === "asc" ? cmp : -cmp;
+    });
+  }, [data, sortKey, sortDir]);
 
   const totalPages = Math.ceil(sorted.length / pageSize);
   const paged = sorted.slice(page * pageSize, (page + 1) * pageSize);
@@ -107,7 +109,7 @@ export function DataTable<T>({
         <div className="mt-4 flex items-center justify-between">
           <p className="text-sm text-gray-500">
             Mostrando {page * pageSize + 1}–
-            {Math.min((page + 1) * pageSize, data.length)} de {data.length}
+            {Math.min((page + 1) * pageSize, sorted.length)} de {sorted.length}
           </p>
           <div className="flex gap-2">
             <button

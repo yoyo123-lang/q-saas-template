@@ -12,9 +12,9 @@ export function generateSEO({
   title,
   description,
   path = "",
-  ogImage = "/og-default.png",
+  ogImage = "/og-default.svg",
 }: SEOProps): Metadata {
-  const baseUrl = process.env.NEXTAUTH_URL ?? "http://localhost:3000";
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? process.env.NEXTAUTH_URL ?? "http://localhost:3000";
   const url = `${baseUrl}${path}`;
 
   return {

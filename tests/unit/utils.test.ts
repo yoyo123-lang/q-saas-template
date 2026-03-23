@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { cn, formatDate, formatNumber } from "@/lib/utils";
+import { cn, formatDate, formatNumber, formatCurrency } from "@/lib/utils";
 
 describe("cn", () => {
   it("retorna clases simples sin cambios", () => {
@@ -71,5 +71,19 @@ describe("formatNumber", () => {
   it("formatea un número grande con separador de miles", () => {
     const result = formatNumber(1234567, 0);
     expect(result).toBe("1.234.567");
+  });
+});
+
+describe("formatCurrency", () => {
+  it("formatea pesos argentinos con símbolo", () => {
+    expect(formatCurrency(1000.5)).toBe("$ 1.000,50");
+  });
+
+  it("formatea cero", () => {
+    expect(formatCurrency(0)).toBe("$ 0,00");
+  });
+
+  it("respeta decimales custom", () => {
+    expect(formatCurrency(1234.5, 0)).toBe("$ 1.235");
   });
 });

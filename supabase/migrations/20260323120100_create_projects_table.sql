@@ -18,3 +18,5 @@ CREATE TABLE IF NOT EXISTS "Project" (
 
 CREATE INDEX IF NOT EXISTS "Project_userId_idx" ON "Project"("userId");
 CREATE INDEX IF NOT EXISTS "Project_status_idx" ON "Project"("status");
+-- Índice compuesto para el query pattern principal: userId + deletedAt + createdAt
+CREATE INDEX IF NOT EXISTS "Project_userId_deletedAt_createdAt_idx" ON "Project"("userId", "deletedAt", "createdAt" DESC);

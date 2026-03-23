@@ -12,7 +12,7 @@
 
 ### Regla absoluta
 
-**Antes de hacer push, commit final, o cualquier subida a Railway/Vercel, Claude Code DEBE correr el build completo localmente y verificar que pase sin errores.**
+**Antes de hacer push, commit final, o cualquier subida a producción (Vercel u otro host), Claude Code DEBE correr el build completo localmente y verificar que pase sin errores.**
 
 No hay excepciones. Si no compila acá, no va a compilar allá.
 

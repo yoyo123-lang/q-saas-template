@@ -6,16 +6,55 @@
 > Si no hay verificación automática, no hay garantía de calidad.
 > Para verificación funcional con datos reales (que lo que se implementó hace lo que se pidió) → ver `PRE_DEPLOY_AND_QA.md` (Parte 2).
 
-## 1) Estrategia por capa
+## 1) Estado actual del template
 
-| Capa | Tipo | Objetivo | Cobertura mínima sugerida |
+### Qué hay hoy
+
+| Tipo | Ubicación | Qué validan | Qué NO validan |
 |---|---|---|---|
-| Dominio | unit tests | reglas de negocio | 85% |
-| Integración | integration tests | contratos entre módulos | 70% |
-| API | contract/smoke | endpoints críticos | 100% endpoints críticos |
-| UI (si aplica) | e2e | flujos de usuario clave | happy paths + errores |
+| Tests unitarios (Zod) | `tests/unit/` | Schemas de validación aislados | — |
+| Tests de handlers con mocks | `tests/integration/` | Lógica de API route handlers (auth, validación, CRUD, ownership, soft delete) | No tocan DB real ni auth real — Prisma y `requireAuth` están mockeados |
 
-## 2) Qué testear siempre
+**Total:** ~14 tests de handlers + tests unitarios de schemas.
+
+### Qué NO hay todavía
+
+| Tipo | Estado | Prioridad para proyectos derivados |
+|---|---|---|
+| Tests de integración real (DB) | No implementado | Media — agregar cuando haya lógica de negocio compleja |
+| Smoke tests (health + auth flow) | No implementado | Media — útil como gate de CI |
+| Tests e2e (Playwright/Cypress) | No implementado | Baja — agregar cuando haya flujos críticos de usuario |
+| Tests de componentes React | No implementado | Baja — la UI del template es simple |
+
+### Honestidad sobre los tests de `tests/integration/`
+
+Los tests en `tests/integration/projects-api.test.ts` están categorizados como "integración" pero técnicamente son **tests de handlers con mocks**. Mockean `prisma` y `requireAuth` con `vi.mock()` y prueban la lógica de los route handlers de forma aislada.
+
+**Lo que sí validan** (y es valioso):
+- Que los handlers retornen los status codes correctos (401, 400, 404, 200, 201)
+- Que la validación Zod funcione (nombres vacíos, status inválidos)
+- Que el ownership check funcione (no ves proyectos de otro usuario)
+- Que el soft delete use `deletedAt` en lugar de borrado físico
+- Que la paginación por cursor funcione correctamente
+
+**Lo que no validan:**
+- Que las queries Prisma realmente funcionen contra una DB
+- Que el flujo real de auth (NextAuth → Google → callback → sesión) funcione
+- Que el middleware redirija correctamente en runtime
+
+Esta distinción es importante para no tener falsa confianza.
+
+## 2) Estrategia por capa
+
+| Capa | Tipo | Objetivo | Estado en template |
+|---|---|---|---|
+| Validación | unit tests | Schemas Zod | Implementado |
+| API handlers | tests con mocks | Lógica de handlers | Implementado |
+| API + DB | integración real | Queries Prisma contra DB real | Pendiente |
+| Endpoints | smoke tests | Health + respuesta mínima | Pendiente |
+| UI | e2e | Flujos de usuario completos | Pendiente |
+
+## 3) Qué testear siempre
 
 - Autenticación/autorización.
 - Reglas de negocio críticas.
@@ -23,35 +62,44 @@
 - Integraciones externas (con mocks/stubs controlados).
 - Manejo de errores y casos borde.
 
-## 3) Qué se puede omitir
+## 4) Qué se puede omitir
 
 - Getters/setters triviales.
 - UI estática sin lógica.
 - Código generado automáticamente (si está cubierto por integración).
 
-## 4) Datos de prueba
+## 5) Datos de prueba
 
 - Usar factories/fixtures versionados.
-- Test DB aislada por ambiente.
+- Test DB aislada por ambiente (cuando se implemente integración real).
 - Limpieza automática entre tests.
 - Prohibido usar datos reales de producción.
 
-## 5) Nomenclatura
+## 6) Nomenclatura
 
 `<módulo>.<función_o_caso>.spec|test`
 
 Ejemplo: `auth.login.invalid_password.spec.ts`
 
-## 6) Proceso mínimo en cada PR
+## 7) Proceso mínimo en cada PR
 
-1. Ejecutar unit + integración.
-2. Ejecutar lint/format/typecheck.
-3. Ejecutar smoke tests de endpoints críticos.
+1. Ejecutar unit + tests de handlers (`npm test`).
+2. Ejecutar lint/format/typecheck (`npm run lint`).
+3. Build limpio (`npm run build`).
 4. Adjuntar comandos en la descripción del PR.
 
-## 7) Anti-patrones
+## 8) Anti-patrones
 
 - Tests frágiles dependientes de orden.
 - Sleeps fijos en vez de sincronización.
 - Mockear tanto que no se valida integración real.
 - Pasar tests localmente pero no en CI.
+- **Llamar "tests de integración" a tests que mockean todo** — ser honesto con lo que validan.
+
+## 9) Siguiente escalón recomendado
+
+Cuando un proyecto derivado necesite más confianza, agregar en este orden:
+
+1. **Smoke test de health endpoint** — Un test que levante la app y haga `GET /api/health`. Valida que el build funciona y la DB conecta. Mínimo esfuerzo, máximo valor como gate de CI.
+2. **Tests de integración real con DB de test** — Usar una DB PostgreSQL de test (Docker o Supabase local) para validar queries Prisma reales. Priorizar endpoints con lógica compleja.
+3. **E2e mínimo** — Un flujo de login → dashboard → CRUD con Playwright. Solo cuando haya flujos de usuario que justifiquen el costo de mantener la suite.

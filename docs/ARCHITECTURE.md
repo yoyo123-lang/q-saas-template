@@ -41,7 +41,19 @@
 | api | Endpoints REST estandarizados | Respuestas con contrato API_STANDARDS |
 | seo | Metadata, robots, sitemap, OG tags | - |
 
-### 2.4 Comunicación interna
+### 2.4 Modelo de protección de rutas (3 capas)
+
+| Capa | Dónde | Qué verifica | Toca DB? | Limitación |
+|---|---|---|---|---|
+| 1. Middleware | `src/middleware.ts` | Cookie de sesión existe | No | Cookie expirada o corrupta pasa el check |
+| 2. Layout | `src/app/dashboard/layout.tsx` | Sesión válida vía `auth()` | Sí | No verifica rol — solo autenticación |
+| 3. API routes | `requireAuth()` / `requireAdmin()` | Sesión + rol | Sí (vía session callback) | — |
+
+**Por qué el middleware no valida la sesión:** El Edge Runtime no puede ejecutar Prisma ni queries a DB. El middleware es una optimización que evita cargar la página completa para usuarios sin cookie. La seguridad real está en las capas 2 y 3.
+
+**Consecuencia:** Un usuario con cookie expirada verá brevemente la carga del layout antes de ser redirigido a `/login` por la Capa 2. Esto es aceptable para el template.
+
+### 2.5 Comunicación interna
 
 | Origen | Destino | Mecanismo |
 |---|---|---|
@@ -50,7 +62,7 @@
 | API routes | Prisma/DB | Queries directas |
 | Client components | API routes | `fetch` via hooks custom |
 
-### 2.5 Dependencias externas
+### 2.6 Dependencias externas
 
 | Servicio | Uso | Riesgo | Fallback |
 |---|---|---|---|
@@ -58,24 +70,24 @@
 | Supabase | Base de datos | Bajo | PostgreSQL estándar (migrable) |
 | Vercel | Deploy | Bajo | Railway como alternativa |
 
-### 2.6 ADRs
+### 2.7 ADRs
 
 - `ADR-0001-sistema-documentacion-modular.md` — Documentación modular con CLAUDE.md corto
 - `ADR-0002-mejoras-inspiradas-en-superpowers.md` — Mejoras del sistema de reglas
 - `ADR-0003-template-con-codigo-base.md` — Decisión de agregar código funcional al template
-- `ADR-0004-versiones-reales-del-stack.md` — Versiones reales usadas (Next.js 16, Zod 4) y sus implicaciones
+- `ADR-0004-versiones-reales-del-stack.md` — Versiones reales usadas (Next.js 15, Zod 3) y decisiones de downgrade
 
 ## 3) Stack tecnológico
 
 | Componente | Tecnología | Versión | Motivo |
 |---|---|---|---|
 | Lenguaje | TypeScript | 5.x (strict) | Consistencia, tipos |
-| Framework | Next.js | 16.x (App Router) | Máximo contexto Claude Code |
+| Framework | Next.js | 15.x (App Router) | LTS estable, máximo contexto Claude Code |
 | Estilos | Tailwind CSS | 4.x | Mobile-first, ya en uso |
 | Base de datos | PostgreSQL (Supabase) | 15+ | Tier gratuito, auth integrada |
 | ORM | Prisma | 6.x | Tipos auto-generados |
 | Auth | NextAuth (Auth.js) | v5 (beta) | Playbook probado |
-| Validación | Zod | 4.x | Server-side, inferencia |
+| Validación | Zod | 3.x | Server-side, inferencia, API estable |
 | UI | Tailwind + Radix UI | - | Componentes custom (shadcn/ui se instala por proyecto) |
 | Deploy | Vercel | n/a | Ya en uso |
 
@@ -130,7 +142,7 @@ q-saas-template/
 │   └── middleware.ts               # Protección de rutas
 ├── tests/
 │   ├── unit/                       # Tests unitarios
-│   └── integration/                # Tests de integración (pendiente completar)
+│   └── integration/                # Tests de handlers con mocks (API routes)
 └── public/                         # Assets estáticos
 ```
 
@@ -146,7 +158,7 @@ Definidas en `.env.example`:
 | NEXTAUTH_SECRET | Secret para firmar sesiones | Sí |
 | GOOGLE_CLIENT_ID | OAuth client ID | Sí |
 | GOOGLE_CLIENT_SECRET | OAuth client secret | Sí |
-| ADMIN_EMAIL | Email del admin para seed | Sí (setup) |
+| ADMIN_EMAIL | Email del admin (seed + auto-promoción a ADMIN en primer login) | Sí |
 
 ## 6) Restricciones conocidas
 

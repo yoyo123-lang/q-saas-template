@@ -1,10 +1,23 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
+/**
+ * Capa 1 de protección: verificación rápida de cookie en Edge Runtime.
+ *
+ * IMPORTANTE: Solo verifica que la cookie de sesión EXISTA, no que sea válida.
+ * Una cookie expirada o corrupta pasará este check. Esto es intencional:
+ * - El Edge Runtime no puede ejecutar Prisma ni validar sesiones contra DB.
+ * - La validación real ocurre en la Capa 2 (layouts y API routes con `auth()`).
+ *
+ * Modelo de protección completo:
+ *   Capa 1 (este middleware) → cookie existe → deja pasar
+ *   Capa 2 (dashboard/layout.tsx) → auth() valida sesión contra DB → redirect si inválida
+ *   Capa 3 (requireAdmin/requireAuth) → verifica rol para API routes
+ */
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  // Rutas públicas
+  // Rutas públicas — no requieren autenticación
   if (
     pathname === "/" ||
     pathname === "/login" ||

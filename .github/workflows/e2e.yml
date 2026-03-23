@@ -11,6 +11,7 @@ env:
   NEXTAUTH_SECRET: "ci-test-secret-not-for-production"
   NEXTAUTH_URL: "http://localhost:3000"
   DATABASE_URL: "postgresql://postgres:postgres@localhost:5432/e2e_test"
+  DIRECT_URL: "postgresql://postgres:postgres@localhost:5432/e2e_test"
   # Dummy values — el auth real no se usa en e2e (usamos sesión sintética)
   GOOGLE_CLIENT_ID: "dummy-for-ci"
   GOOGLE_CLIENT_SECRET: "dummy-for-ci"

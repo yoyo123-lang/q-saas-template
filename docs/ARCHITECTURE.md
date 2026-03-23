@@ -63,19 +63,20 @@
 - `ADR-0001-sistema-documentacion-modular.md` — Documentación modular con CLAUDE.md corto
 - `ADR-0002-mejoras-inspiradas-en-superpowers.md` — Mejoras del sistema de reglas
 - `ADR-0003-template-con-codigo-base.md` — Decisión de agregar código funcional al template
+- `ADR-0004-versiones-reales-del-stack.md` — Versiones reales usadas (Next.js 16, Zod 4) y sus implicaciones
 
 ## 3) Stack tecnológico
 
 | Componente | Tecnología | Versión | Motivo |
 |---|---|---|---|
 | Lenguaje | TypeScript | 5.x (strict) | Consistencia, tipos |
-| Framework | Next.js | 15.x (App Router) | Máximo contexto Claude Code |
+| Framework | Next.js | 16.x (App Router) | Máximo contexto Claude Code |
 | Estilos | Tailwind CSS | 4.x | Mobile-first, ya en uso |
 | Base de datos | PostgreSQL (Supabase) | 15+ | Tier gratuito, auth integrada |
 | ORM | Prisma | 6.x | Tipos auto-generados |
 | Auth | NextAuth (Auth.js) | v5 (beta) | Playbook probado |
-| Validación | Zod | 3.x | Server-side, inferencia |
-| UI | shadcn/ui | latest | Accesible, sin vendor lock-in |
+| Validación | Zod | 4.x | Server-side, inferencia |
+| UI | Tailwind + Radix UI | - | Componentes custom (shadcn/ui se instala por proyecto) |
 | Deploy | Vercel | n/a | Ya en uso |
 
 ### 3.1 Tecnologías prohibidas/deprecadas
@@ -110,13 +111,12 @@ q-saas-template/
 │   │   │   ├── auth/[...nextauth]/ # NextAuth handler
 │   │   │   ├── health/             # Health check
 │   │   │   └── v1/projects/        # CRUD ejemplo
-│   │   └── (dashboard)/            # Rutas protegidas
+│   │   └── dashboard/              # Rutas protegidas
 │   │       ├── layout.tsx          # Auth check + sidebar
 │   │       ├── page.tsx            # Dashboard home
 │   │       └── projects/           # Páginas del CRUD
 │   ├── components/
-│   │   ├── ui/                     # shadcn/ui
-│   │   ├── layout/                 # Sidebar, header, breadcrumbs
+│   │   ├── layout/                 # Sidebar, header, breadcrumbs, nav-config
 │   │   └── shared/                 # Loading, empty, error, etc.
 │   ├── lib/
 │   │   ├── auth.ts                 # Config NextAuth
@@ -130,7 +130,7 @@ q-saas-template/
 │   └── middleware.ts               # Protección de rutas
 ├── tests/
 │   ├── unit/                       # Tests unitarios
-│   └── integration/                # Tests de integración
+│   └── integration/                # Tests de integración (pendiente completar)
 └── public/                         # Assets estáticos
 ```
 
@@ -152,7 +152,7 @@ Definidas en `.env.example`:
 
 - Formato argentino obligatorio: números (1.000,50), fechas (DD/MM/AAAA)
 - Español argentino en toda la UI
-- shadcn/ui se instala componente por componente
+- El template incluye componentes UI custom (Tailwind + Radix). shadcn/ui se instala por proyecto con `npx shadcn@latest init`
 - TDD obligatorio para lógica de negocio
 - Archivos del templete-blanco no se modifican (excepto ARCHITECTURE.md y README.md)
 

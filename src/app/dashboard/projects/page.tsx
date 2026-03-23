@@ -48,9 +48,7 @@ export default function ProjectsPage() {
       <div className="mb-6 flex items-center justify-between">
         <h1 className="text-2xl font-bold text-gray-900">Proyectos</h1>
         <button
-          onClick={() => {
-            /* TODO: modal o página de creación */
-          }}
+          onClick={() => router.push("/dashboard/projects/new")}
           className="flex items-center gap-2 rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-gray-800"
         >
           <Plus className="h-4 w-4" />

@@ -43,7 +43,12 @@ Ejemplo:
 **Archivos afectados**: Todo lugar donde se parsee JSON de fuentes externas
 -->
 
-*Todavía no hay errores registrados. Esto se va llenando con el uso.*
+### 2026-03-23 — middleware.ts deprecado en Next.js 16
+
+**Qué pasó**: Next.js 16 emite warning `"middleware" file convention is deprecated. Please use "proxy" instead` al hacer build.
+**Por qué está mal**: No bloquea el build hoy, pero en futuras versiones de Next.js puede romperse la protección de rutas.
+**Qué hacer en vez**: Migrar `src/middleware.ts` a la convención `proxy` de Next.js 16 cuando la documentación oficial esté estable. Por ahora el archivo funciona normalmente.
+**Archivos afectados**: `src/middleware.ts`
 
 ---
 

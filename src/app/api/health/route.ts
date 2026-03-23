@@ -10,7 +10,9 @@ export async function GET() {
   try {
     await prisma.$queryRaw`SELECT 1`;
     dbConnected = true;
-  } catch {
+  } catch (err) {
+    // Intencional: capturamos el error para degradar el estado, no para propagarlo
+    console.error("[health] Error de conexión a la base de datos:", err);
     dbConnected = false;
   }
 

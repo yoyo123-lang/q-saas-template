@@ -26,13 +26,13 @@
 
 | Componente | Tecnología |
 |---|---|
-| Framework | Next.js 16 (App Router) |
+| Framework | Next.js 15 (App Router) |
 | Lenguaje | TypeScript (strict) |
 | Estilos | Tailwind CSS 4 |
 | Base de datos | Supabase (PostgreSQL) |
 | ORM | Prisma 6 |
 | Auth | NextAuth v5 + Google OAuth |
-| Validación | Zod 4 |
+| Validación | Zod 3 |
 | Deploy | Vercel |
 
 ## Setup en 5 minutos

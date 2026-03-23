@@ -1,5 +1,4 @@
 import { auth } from "@/lib/auth";
-import { prisma } from "@/lib/db";
 import { NextResponse } from "next/server";
 
 interface AuthResult {
@@ -21,12 +20,8 @@ export async function requireAdmin(): Promise<AuthResult> {
     };
   }
 
-  const user = await prisma.user.findUnique({
-    where: { id: session.user.id },
-    select: { role: true },
-  });
-
-  if (user?.role !== "ADMIN") {
+  // Usa el role del session callback — evita una query extra a DB por request
+  if (session.user.role !== "ADMIN") {
     return {
       error: NextResponse.json(
         { success: false, error: { code: "FORBIDDEN", message: "No autorizado" } },

@@ -91,4 +91,5 @@ model Project {
 
   @@index([userId])
   @@index([status])
+  @@index([userId, deletedAt, createdAt])
 }

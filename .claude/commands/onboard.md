@@ -73,7 +73,9 @@ DIAGNÓSTICO:
 
 ## Paso 4: Completar ARCHITECTURE.md
 
-Con lo que descubriste, completá `docs/ARCHITECTURE.md` con datos reales del proyecto. Reemplazá todos los `[completar]` con información concreta.
+1. Si existe `docs/ARCHITECTURE_TEMPLATE.md` (versión con placeholders), renombralo a `docs/ARCHITECTURE.md`
+2. Si `docs/ARCHITECTURE.md` ya tiene datos del template (no del proyecto), reemplazá todo el contenido con los placeholders de `ARCHITECTURE_TEMPLATE.md`
+3. Con lo que descubriste, completá `docs/ARCHITECTURE.md` con datos reales del proyecto. Reemplazá todos los `[completar]` con información concreta.
 
 Mostrá el resultado al usuario para validación.
 
@@ -137,7 +139,36 @@ Si el proyecto tiene build y lint funcionando, proponé configurar hooks mínimo
 
 Preguntá al usuario antes de configurar.
 
-## Paso 9: Confirmar
+## Paso 9: Configurar CI/CD con failure logs to PR
+
+Detectar el estado actual de CI/CD:
+
+```
+CI/CD DETECTADO:
+- GitHub Actions: [sí/no] [listar workflows si existen]
+- Otro CI: [nombre] o "no detectado"
+- Failure logs to PR: [sí/no]
+```
+
+### Si ya tiene GitHub Actions
+
+Verificar si los workflows existentes ya incluyen el step de "failure logs to PR" (buscar `actions/github-script` con `if: failure()`). Si no lo tienen, proponer agregar el step a cada job → ver `docs/ADOPCION_PROYECTOS_EXISTENTES.md` sección "Cómo adaptar los workflows de CI/CD".
+
+### Si NO tiene GitHub Actions
+
+Proponer copiar los workflows del template (`.github/workflows/ci.yml` y `.github/workflows/e2e.yml`) y adaptar los comandos al stack detectado en el Paso 1:
+
+1. Reemplazar `npm ci` / `npm run build` / `npx vitest` por los equivalentes del stack
+2. Ajustar las versiones de Node.js o runtime según corresponda
+3. Mantener el step de "failure logs to PR" sin cambios (es agnóstico al stack)
+
+### Si usa otro CI (no GitHub Actions)
+
+Documentar en el plan de adopción como tarea pendiente: "Adaptar mecanismo de failure logs to PR para [nombre del CI]". El patrón es: si el CI falla en un PR, postear los últimos 80 líneas de logs como comentario en el PR.
+
+Preguntá al usuario antes de hacer cambios en workflows.
+
+## Paso 10: Confirmar
 
 ```
 ✅ ONBOARDING COMPLETO
@@ -146,6 +177,7 @@ Stack: [resumen]
 Documentación creada: [lista]
 Quick wins aplicados: [lista o "ninguno"]
 Hooks configurados: [lista o "ninguno"]
+CI/CD failure logs to PR: [configurado/pendiente/no aplica]
 Build: ✅ sigue pasando
 
 PRÓXIMOS PASOS (Fase 2):

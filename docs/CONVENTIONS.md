@@ -99,7 +99,11 @@ Validar al inicio y salir rápido. Evitar pirámides de ifs anidados. Esto aplic
 - Índices para columnas que se usan en filtros o joins
 - Nombres de tablas en plural, columnas en singular (convención, ajustar al proyecto)
 
-## Supabase
+## Supabase (solo si el proyecto usa Supabase)
+
+> **Condicional:** Esta sección aplica únicamente si el proyecto usa Supabase como base de datos.
+> Si usás otro motor (PostgreSQL directo, MySQL, SQLite, etc.), seguí las convenciones de migraciones de tu ORM o herramienta de migraciones.
+> El skill `/project:onboard` detecta automáticamente si Supabase está presente.
 
 ### Migraciones obligatorias
 

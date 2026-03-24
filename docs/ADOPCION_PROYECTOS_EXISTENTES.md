@@ -43,6 +43,7 @@ template/
 ├── .claude/
 │   ├── agents/              ← Copiar TODA la carpeta
 │   └── commands/            ← Copiar TODA la carpeta
+├── .github/workflows/       ← Copiar y ADAPTAR al stack (ver abajo)
 └── CLAUDE.md                ← MERGE, no reemplazar (ver abajo)
 ```
 
@@ -61,6 +62,51 @@ de copiar en docs/_CLAUDE_TEMPLATE.md. Necesito que hagas un merge inteligente:
 - Priorizá mis reglas si hay conflicto
 ```
 
+### Cómo manejar ARCHITECTURE.md
+
+El template trae dos versiones:
+- `docs/ARCHITECTURE.md` — completado con datos del template (sirve como **ejemplo de referencia**)
+- `docs/ARCHITECTURE_TEMPLATE.md` — versión vacía con placeholders `[completar]`
+
+**Para tu proyecto:** Renombrá `ARCHITECTURE_TEMPLATE.md` a `ARCHITECTURE.md` (reemplazando el del template) y completalo con datos reales. Podés consultar el `ARCHITECTURE.md` original del template como ejemplo del formato esperado.
+
+### Cómo adaptar los workflows de CI/CD
+
+Los workflows en `.github/workflows/` incluyen un mecanismo clave: **cuando un CI falla en un PR, postea los logs de error como comentario en el PR**. Esto permite que Claude Code diagnostique errores de CI sin salir de la conversación.
+
+**Si tu proyecto ya tiene workflows:** No los reemplaces. Agregá el step de "failure logs to PR" a cada job existente. El patrón es:
+
+```yaml
+# Agregar al final de cada job, después de todos los steps
+- name: Post failure logs to PR
+  if: failure() && github.event_name == 'pull_request'
+  uses: actions/github-script@v7
+  with:
+    script: |
+      // Descargar logs del job que falló
+      const jobs = await github.rest.actions.listJobsForWorkflowRun({
+        owner: context.repo.owner, repo: context.repo.repo,
+        run_id: context.runId, filter: 'latest'
+      });
+      const failedJob = jobs.data.jobs.find(j => j.conclusion === 'failure');
+      if (!failedJob) return;
+      const logs = await github.rest.actions.downloadJobLogsForWorkflowRun({
+        owner: context.repo.owner, repo: context.repo.repo,
+        job_id: failedJob.id
+      });
+      const lines = logs.data.split('\n');
+      const tail = lines.slice(-80).join('\n');
+      await github.rest.issues.createComment({
+        owner: context.repo.owner, repo: context.repo.repo,
+        issue_number: context.issue.number,
+        body: `## ❌ CI failed\n\`\`\`\n${tail}\n\`\`\`\n[Full logs](${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId})`
+      });
+```
+
+**Si tu proyecto NO tiene workflows:** Copiá los del template y adaptá los comandos de build/test/lint a tu stack. Los comandos del template son para Node.js (`npm run build`, `npx vitest`, etc.) — reemplazalos por los equivalentes de tu lenguaje.
+
+**Prerequisito:** El repositorio necesita permisos de escritura en PRs. En Settings > Actions > General > Workflow permissions, habilitá "Read and write permissions".
+
 ### Qué NO copiar si ya existe en tu proyecto
 - `.gitignore` — mergear a mano si hace falta
 - `package.json`, `requirements.txt`, etc. — nunca sobreescribir
@@ -74,12 +120,12 @@ Esta fase crea un mapa común para dejar de operar "de memoria".
 
 ### 2.1 Completar ARCHITECTURE.md
 
-El template trae `docs/ARCHITECTURE.md` vacío. Pedile a Claude:
+Si seguiste la Fase 1, ya tenés `docs/ARCHITECTURE.md` con placeholders `[completar]`. Pedile a Claude:
 
 ```
 Recorré este proyecto y completá docs/ARCHITECTURE.md con la información real:
 stack, estructura de carpetas, módulos, dependencias, y cómo se levanta.
-Usá el formato que ya tiene el archivo.
+Reemplazá todos los [completar] con datos concretos.
 ```
 
 Revisá el resultado — Claude va a inferir la mayoría pero puede equivocarse en decisiones de diseño que no son obvias desde el código.
@@ -247,6 +293,7 @@ Volver a correr `/project:descubrimiento` cuando:
 - [ ] `GAP_ANALYSIS.md` creado con priorización por riesgo/esfuerzo
 - [ ] `docs/BUSINESS_MODEL.md` completado (si aplica)
 - [ ] Pipeline con gates mínimos (test/lint/build)
+- [ ] Workflows de CI con failure logs to PR configurados
 - [ ] Primera revisión con roles ejecutada
 - [ ] Roadmap 30/60/90 acordado
 - [ ] Rutina de sesión/cierre establecida

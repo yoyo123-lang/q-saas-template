@@ -13,7 +13,8 @@ interface TestUser {
 
 /** Fixture que crea sesión autenticada directamente en DB */
 export const test = base.extend<{ authedPage: Page; testUser: TestUser }>({
-  testUser: async (_, use) => {
+  // eslint-disable-next-line no-empty-pattern
+  testUser: async ({}, use) => {
     const testUser: TestUser = {
       id: `test-user-${Date.now()}`,
       email: `test-${Date.now()}@e2e.local`,

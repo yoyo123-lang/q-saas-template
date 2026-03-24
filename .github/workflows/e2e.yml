@@ -10,6 +10,9 @@ jobs:
     name: Smoke tests
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    permissions:
+      issues: write
+      pull-requests: write
 
     services:
       postgres:
@@ -104,7 +107,6 @@ jobs:
     name: Full E2E suite
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    if: ${{ vars.E2E_DATABASE_URL != '' }}
     permissions:
       contents: read
       issues: write
@@ -126,12 +128,12 @@ jobs:
           --health-retries=5
 
     env:
-      NEXTAUTH_SECRET: ${{ secrets.E2E_NEXTAUTH_SECRET }}
+      NEXTAUTH_SECRET: ${{ secrets.E2E_NEXTAUTH_SECRET || 'ci-test-secret-not-for-production' }}
       NEXTAUTH_URL: "http://localhost:3000"
       DATABASE_URL: ${{ secrets.E2E_DATABASE_URL || 'postgresql://postgres:postgres@localhost:5432/e2e_test' }}
       DIRECT_URL: ${{ secrets.E2E_DIRECT_URL || 'postgresql://postgres:postgres@localhost:5432/e2e_test' }}
-      GOOGLE_CLIENT_ID: ${{ secrets.E2E_GOOGLE_CLIENT_ID }}
-      GOOGLE_CLIENT_SECRET: ${{ secrets.E2E_GOOGLE_CLIENT_SECRET }}
+      GOOGLE_CLIENT_ID: ${{ secrets.E2E_GOOGLE_CLIENT_ID || 'dummy-for-ci' }}
+      GOOGLE_CLIENT_SECRET: ${{ secrets.E2E_GOOGLE_CLIENT_SECRET || 'dummy-for-ci' }}
       ADMIN_EMAIL: ${{ secrets.E2E_ADMIN_EMAIL || 'admin@test.local' }}
 
     steps:

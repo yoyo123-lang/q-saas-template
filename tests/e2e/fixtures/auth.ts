@@ -13,7 +13,7 @@ interface TestUser {
 
 /** Fixture que crea sesión autenticada directamente en DB */
 export const test = base.extend<{ authedPage: Page; testUser: TestUser }>({
-  testUser: async ({}, use) => {
+  testUser: async (_, use) => {
     const testUser: TestUser = {
       id: `test-user-${Date.now()}`,
       email: `test-${Date.now()}@e2e.local`,

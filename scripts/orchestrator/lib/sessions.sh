@@ -178,16 +178,26 @@ next_pending_session() {
 }
 
 # ── Check if project has session prompt files ──
+# Looks for session plan files in multiple locations and naming conventions
 find_session_prompts_dir() {
   local project_path="$1"
 
-  if [ -d "${project_path}/scripts/sessions" ]; then
-    echo "${project_path}/scripts/sessions"
-  elif [ -d "${project_path}/sessions" ]; then
-    echo "${project_path}/sessions"
-  else
-    echo ""
-  fi
+  # Check all known locations (most specific first)
+  local dirs=(
+    "${project_path}/docs/plan_inicial"
+    "${project_path}/scripts/sessions"
+    "${project_path}/sessions"
+    "${project_path}/docs/sessions"
+    "${project_path}/docs/plan"
+  )
+
+  for d in "${dirs[@]}"; do
+    if [ -d "$d" ]; then
+      echo "$d"
+      return
+    fi
+  done
+  echo ""
 }
 
 # ── Check if project has support prompt files ──
@@ -209,7 +219,8 @@ detect_capabilities() {
   local caps=""
 
   [ -f "${project_path}/ROADMAP.md" ] && caps="${caps}roadmap,"
-  [ -n "$(find_session_prompts_dir "$project_path")" ] && caps="${caps}sessions,"
+  local _sd; _sd=$(find_session_prompts_dir "$project_path")
+  [ -n "$_sd" ] && caps="${caps}sessions(${_sd##*/}),"
   [ -n "$(find_support_prompts_dir "$project_path")" ] && caps="${caps}prompts,"
   [ -f "${project_path}/CLAUDE.md" ] && caps="${caps}claude-md,"
   [ -f "${project_path}/.claude/commands/cambio-grande.md" ] && caps="${caps}cambio-grande,"

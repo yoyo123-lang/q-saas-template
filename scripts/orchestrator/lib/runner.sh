@@ -252,15 +252,44 @@ run_session_cambio_grande() {
   echo -e "  ${BOLD}▸ Paso ${current_step}/${total_steps}: Implementación${RESET}"
   save_state "$slug" "$session_num" "implement" "running"
 
+  # Find session prompt file (try multiple naming conventions)
   local session_file=""
   if [ -n "$sessions_dir" ]; then
-    session_file=$(printf "${sessions_dir}/session-%02d.md" "$session_num")
+    local candidates=(
+      "$(printf "${sessions_dir}/sesion-%02d.md" "$session_num")"
+      "$(printf "${sessions_dir}/session-%02d.md" "$session_num")"
+      "${sessions_dir}/sesion-${session_num}.md"
+      "${sessions_dir}/session-${session_num}.md"
+    )
+    for candidate in "${candidates[@]}"; do
+      if [ -f "$candidate" ]; then
+        session_file="$candidate"
+        break
+      fi
+    done
   fi
 
   telemetry_step_start "implement" "$ORCH_MAX_TURNS_IMPLEMENT"
   local step_exit=0
-  if [ -n "$session_file" ] && [ -f "$session_file" ]; then
-    run_claude_file "$project_path" "$session_file" "$model" "$ORCH_MAX_TURNS_IMPLEMENT" \
+  if [ -n "$session_file" ]; then
+    echo -e "    ${DIM:-}(usando plan: ${session_file##*/})${RESET:-}"
+    # Prepend batch-mode instructions to the session file content
+    local session_content
+    session_content=$(cat "$session_file")
+    local prompt="Estás corriendo en modo batch desatendido. NO pidas confirmación, NO esperes aprobación. Ejecutá directamente.
+
+Leé ROADMAP.md para contexto general, y luego seguí este plan detallado para la Sesión ${session_num}:
+
+---
+${session_content}
+---
+
+Reglas:
+- Implementá directamente, commit por tarea atómica
+- TDD obligatorio para lógica de negocio
+- NO te detengas a preguntar o pedir aprobación
+- Si encontrás ambiguedad, elegí la opción más simple y documentá la decisión en un comentario"
+    run_claude "$project_path" "$prompt" "$model" "$ORCH_MAX_TURNS_IMPLEMENT" \
       "${log_dir}/${timestamp}-s${session_num}-implement.log" || step_exit=$?
   else
     local prompt="Estás corriendo en modo batch desatendido. NO pidas confirmación, NO esperes aprobación, NO crees planes sin implementar. Ejecutá directamente.

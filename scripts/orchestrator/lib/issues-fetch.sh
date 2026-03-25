@@ -7,10 +7,17 @@
 #
 # Issue format expected (set by q-company Board):
 #   Title:  [BOARD] {title}
-#   Labels: board-directive, {type}
+#   Labels: board-directive
 #   Body:
+#     <!-- Q-DIRECTIVE-META
+#     directive_id: {id}
+#     signature: {hmac_sha256}
+#     -->
 #     <!-- board:directive_id={id} -->
 #     <!-- board:bu_id={id} -->
+#     ## Directiva del Board — Q Company
+#     | Campo     | Valor      |
+#     |-----------|------------|
 #     | Tipo      | {TYPE}     |
 #     | Prioridad | {PRIORITY} |
 #     | Deadline  | {date|—}   |
@@ -19,6 +26,34 @@
 #     ## Requisitos de implementación
 #     {requirements text}
 #
+
+# ── Verify HMAC-SHA256 signature from Q-DIRECTIVE-META block ──
+# Usage: verify_directive_signature <body> <directive_id> <bu_id> <secret>
+# Returns: 0 if valid, 1 if invalid or missing
+# Requires: openssl
+verify_directive_signature() {
+  local body="$1"
+  local directive_id="$2"
+  local bu_id="$3"
+  local secret="$4"
+
+  if ! command -v openssl &>/dev/null; then
+    ui_warn "openssl no encontrado — no se puede verificar firma HMAC"
+    return 1
+  fi
+
+  local sig
+  sig=$(echo "$body" | grep 'signature:' | head -1 \
+    | sed 's/.*signature:[[:space:]]*//' | tr -d ' \r')
+  [ -z "$sig" ] && return 1
+
+  local expected
+  expected=$(printf '%s:%s' "$directive_id" "$bu_id" \
+    | openssl dgst -sha256 -hmac "$secret" 2>/dev/null \
+    | sed 's/.* //')
+
+  [ "$sig" = "$expected" ]
+}
 
 # ── Fetch open issues for a single repo ──
 # Usage: fetch_open_issues <owner/repo>
@@ -108,7 +143,7 @@ _parse_board_comment() {
   # Portable: grep -oP not available on macOS BSD grep → use sed
   echo "$body" \
     | grep "board:${key}=" \
-    | sed "s/.*board:${key}=\([^[:space:]>-]*\).*/\1/" \
+    | sed "s/.*board:${key}=\([^[:space:]>]*\).*/\1/" \
     | head -1 \
     | tr -d ' '
 }
@@ -122,7 +157,7 @@ _parse_table_field() {
   # Match table row: | Prioridad | VALUE |
   echo "$body" | grep -i "^[[:space:]]*|[[:space:]]*${field}[[:space:]]*|" \
     | head -1 \
-    | sed 's/.*|[^|]*|[[:space:]]*//' \
+    | sed 's/^[[:space:]]*|[^|]*|[[:space:]]*//' \
     | sed 's/[[:space:]]*|.*//' \
     | sed 's/^[[:space:]]*//;s/[[:space:]]*$//'
 }

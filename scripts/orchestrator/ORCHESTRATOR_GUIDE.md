@@ -96,13 +96,181 @@ Sesión N
 
 ### Modos disponibles
 
-| Modo | Función en runner.sh | Descripción |
-|------|---------------------|-------------|
-| Continuar roadmap | `run_session_cambio_grande()` | Ejecuta pipeline completo por sesión. Puede auto-continuar todas las pendientes. |
-| Roadmap nuevo | `run_roadmap()` | Pide descripción y genera ROADMAP.md |
-| Cambio grande | `run_cambio_grande_standalone()` | Pipeline completo sin sesión de roadmap |
-| Cambio puntual | `run_cambio()` | Ejecuta `/project:cambio` o prompt inline |
-| Sesión libre | `run_sesion()` | Abre Claude interactivo en el proyecto |
+| Modo | Función | Descripción |
+|------|---------|-------------|
+| Continuar roadmap | `run_session_cambio_grande()` en `runner.sh` | Pipeline completo por sesión. Puede auto-continuar todas las pendientes. |
+| Roadmap nuevo | `run_roadmap()` en `runner.sh` | Pide descripción y genera ROADMAP.md |
+| Cambio grande | `run_cambio_grande_standalone()` en `runner.sh` | Pipeline completo sin sesión de roadmap |
+| Cambio puntual | `run_cambio()` en `runner.sh` | Ejecuta `/project:cambio` o prompt inline |
+| Sesión libre | `run_sesion()` en `runner.sh` | Abre Claude interactivo en el proyecto |
+| **Issues** | `run_issues_mode()` en `lib/issues-runner.sh` | Batch processing de directivas del Board vía GitHub Issues. No usa el proyecto seleccionado — opera sobre `ORCH_ISSUES_REPOS`. Solo visible si esa variable está configurada. |
+
+---
+
+---
+
+## Modo issues — batch processing de directivas del Board
+
+> Documentación completa de diseño en `docs/decisions/ADR-0005-orchestrator-issues-mode.md`
+
+### Qué hace
+
+Escanea GitHub Issues con label `board-directive` en N repos, parsea las directivas embebidas en el body, las prioriza por severidad (CRITICAL > HIGH > MEDIUM > LOW), y para cada una:
+
+1. Clona o actualiza el repo BU
+2. Crea branch `directive/{directive_id}`
+3. Implementa vía `run_claude()`
+4. Corre CI y push vía `run_ci_check_and_fix()` (strategy: direct)
+5. Crea PR draft con `gh pr create`
+6. Comenta en el issue con el resultado
+7. Notifica al Board vía `PATCH /api/v1/bu/{buId}/directives/{id}/status`
+
+Al finalizar genera un morning report en `~/.q-orchestrator/reports/morning-report-YYYYMMDD.md`.
+
+### Estructura de archivos nuevos
+
+```
+lib/
+├── issues-board-api.sh   ← PATCH al Board API + builders de JSON payload
+├── issues-fetch.sh       ← Fetch de GitHub Issues + parse del body (sin jq)
+├── issues-queue.sh       ← Priorización CRITICAL→LOW + state por issue
+├── issues-runner.sh      ← Loop de procesamiento + entry point run_issues_mode()
+└── issues-report.sh      ← Generador de morning report en Markdown
+```
+
+### Estado global en el sistema (adición)
+
+```
+~/.q-orchestrator/
+├── issues-state/
+│   └── {owner_repo}/
+│       └── {issue_number}.json     ← Estado por issue (in_progress/completed/failed)
+└── reports/
+    └── morning-report-YYYYMMDD.md  ← Reporte generado al final de cada corrida
+```
+
+**Estructura del state file por issue:**
+```json
+{
+  "directive_id": "cmn6c4...",
+  "repo": "yoyo123-lang/qautiva",
+  "issue_number": 42,
+  "status": "completed",
+  "started_at": "2026-03-25T22:00:00Z",
+  "finished_at": "2026-03-25T22:45:00Z",
+  "pr_url": "https://github.com/yoyo123-lang/qautiva/pull/42",
+  "attempts": 1,
+  "run_id": "20260325-220000",
+  "last_log": "~/.q-orchestrator/logs/issues/qautiva/..."
+}
+```
+
+### Variables ORCH_ISSUES_* (agregadas a config.sh)
+
+| Variable | Default | Descripción |
+|----------|---------|-------------|
+| `ORCH_ISSUES_REPOS` | `""` | Repos a escanear, space-separated (`"owner/repo1 owner/repo2"`). Si está vacío, el modo no aparece en el menú. |
+| `ORCH_ISSUES_MAX_PER_RUN` | `5` | Límite de issues procesados por corrida (control de costos) |
+| `ORCH_ISSUES_DRAFT_PR` | `true` | Crear PRs como draft (requiere revisión manual antes de merge) |
+| `ORCH_ISSUES_WORKSPACE` | `$HOME/projects` | Directorio donde se clonan los repos BU |
+| `ORCH_ISSUES_REPORT_DIR` | `$CONFIG_DIR/reports` | Directorio de morning reports |
+| `ORCH_ISSUES_LABEL` | `board-directive` | Label de GitHub que identifica issues del Board |
+| `ORCH_BOARD_URL` | `https://q-company.vercel.app` | URL base del Board API |
+
+### Configuración por BU (`.q-orchestrator.sh` en cada repo BU)
+
+Cada repo BU necesita estas variables en su `.q-orchestrator.sh`:
+
+```bash
+ORCH_BU_ID="cm..."                    # ID en el Board
+ORCH_BU_SLUG="qautiva"                # Slug legible
+ORCH_BU_API_KEY="qb_qautiva_..."      # API key para el Board
+ORCH_BU_REPO="yoyo123-lang/qautiva"   # owner/repo
+ORCH_BU_BUILD_CMD="npm run build"     # Comando de build (opcional)
+ORCH_BU_TEST_CMD="npm test"           # Comando de tests (opcional)
+```
+
+### Formato del GitHub Issue (contrato con q-company)
+
+El body del issue DEBE tener estos elementos para ser procesado:
+
+```markdown
+<!-- board:directive_id={id} -->
+<!-- board:bu_id={id} -->
+
+| Campo     | Valor                |
+|-----------|----------------------|
+| Tipo      | CONFIG_CHANGE        |
+| Prioridad | LOW                  |
+| ...       | ...                  |
+
+## Instrucciones
+
+{texto de implementación — se convierte en prompt para Claude}
+
+## Requisitos de implementación
+
+{restricciones adicionales}
+```
+
+Issues sin el HTML comment `<!-- board:directive_id=... -->` son ignorados silenciosamente.
+
+### Pipeline por issue
+
+```
+GitHub Issue (OPEN + label board-directive)
+  │
+  ├─ parse body → directive_id, bu_id, tipo, prioridad, instrucciones
+  ├─ PATCH Board → "in_progress"
+  ├─ git clone --depth 1 (o pull) del repo BU
+  ├─ git checkout -b directive/{directive_id}
+  ├─ run_claude() — implementa con prompt construido del issue
+  │    MAX_TURNS = ORCH_MAX_TURNS_IMPLEMENT (default: 80)
+  ├─ run_ci_check_and_fix() — build + test + push (ORCH_BRANCH_STRATEGY=direct)
+  │    Reintentos = ORCH_CI_MAX_RETRIES (default: 3)
+  ├─ gh pr create --draft → directive/{directive_id}
+  ├─ gh issue comment → resultado con PR URL
+  └─ PATCH Board → "completed" | "failed"
+```
+
+### Uso como cron nocturno
+
+```bash
+# crontab -e
+0 22 * * * /path/to/q-orchestrator.sh --project cualquier-slug --mode issues >> /var/log/q-orchestrator-issues.log 2>&1
+```
+
+O sin selección de proyecto (el modo issues lo ignora):
+```bash
+0 22 * * * ORCH_ISSUES_REPOS="yoyo123-lang/qautiva yoyo123-lang/qapitaliza" \
+  /path/to/q-orchestrator.sh --project dummy --mode issues
+```
+
+### Funciones públicas (issues-runner.sh)
+
+| Función | Args | Descripción |
+|---------|------|-------------|
+| `run_issues_mode(_, _, model)` | ignorar project_path y slug | Entry point del modo |
+| `process_single_issue(record, run_id, model, log_dir)` | record = pipe-separated queue record | Procesa un issue end-to-end |
+| `ensure_repo_cloned(repo, workspace)` | owner/repo | Clone o update; sets `_REPO_LOCAL_PATH` |
+| `create_directive_branch(repo_path, directive_id)` | — | git checkout -b directive/{id} |
+| `handle_issue_failure(repo, number, directive_id, bu_id, repo_path, error_type, log, attempts, run_id)` | — | Logging + state + comment + Board notif |
+
+### Debugging del modo issues
+
+```bash
+# Ver state de un issue
+cat ~/.q-orchestrator/issues-state/yoyo123-lang_qautiva/42.json
+
+# Resetear state de un issue (permite reprocesarlo)
+rm ~/.q-orchestrator/issues-state/yoyo123-lang_qautiva/42.json
+
+# Ver el último morning report
+cat ~/.q-orchestrator/reports/morning-report-$(date +%Y-%m-%d).md
+
+# Ver logs de un issue específico
+ls ~/.q-orchestrator/logs/issues/qautiva/
+```
 
 ---
 

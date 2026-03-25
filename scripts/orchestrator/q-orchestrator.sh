@@ -23,6 +23,11 @@ source "${SCRIPT_DIR}/lib/config.sh"
 source "${SCRIPT_DIR}/lib/sessions.sh"
 source "${SCRIPT_DIR}/lib/telemetry.sh"
 source "${SCRIPT_DIR}/lib/runner.sh"
+source "${SCRIPT_DIR}/lib/issues-board-api.sh"
+source "${SCRIPT_DIR}/lib/issues-fetch.sh"
+source "${SCRIPT_DIR}/lib/issues-queue.sh"
+source "${SCRIPT_DIR}/lib/issues-report.sh"
+source "${SCRIPT_DIR}/lib/issues-runner.sh"
 
 # ── Help ──
 show_help() {
@@ -34,7 +39,7 @@ show_help() {
   echo "  ./q-orchestrator.sh --project <slug> --mode continue"
   echo "  ./q-orchestrator.sh --model claude-opus-4-6"
   echo ""
-  echo "Modes: continue, roadmap, cambio-grande, cambio, sesion"
+  echo "Modes: continue, roadmap, cambio-grande, cambio, sesion, issues"
   echo ""
   echo "Config: ~/.q-orchestrator/projects.json"
 }
@@ -609,6 +614,12 @@ select_and_run_mode() {
   options+=("Sesión libre (interactiva)")
   modes+=("sesion")
 
+  # Show issues mode only if ORCH_ISSUES_REPOS is configured
+  if [ -n "${ORCH_ISSUES_REPOS:-}" ]; then
+    options+=("Issues mode (Board directives batch)")
+    modes+=("issues")
+  fi
+
   ui_menu "MODO DE TRABAJO — ${slug}" "${options[@]}"
   local selected_mode="${modes[$((MENU_CHOICE - 1))]}"
 
@@ -621,6 +632,7 @@ select_and_run_mode() {
     cambio-grande) run_mode_cambio_grande "$project_path" "$slug" "$model" ;;
     cambio)    run_mode_cambio "$project_path" "$slug" "$model" ;;
     sesion)    run_mode_sesion "$project_path" "$slug" "$model" ;;
+    issues)    run_issues_mode "$project_path" "$slug" "$model" ;;
   esac
 }
 

@@ -138,7 +138,12 @@ scripts/orchestrator/               ← El orquestador (en q-saas-template)
 │   ├── ui.sh                       ← UI helpers
 │   ├── projects.sh                 ← Registro de proyectos
 │   ├── sessions.sh                 ← Detección de sesiones
-│   └── runner.sh                   ← Ejecución de Claude CLI
+│   ├── runner.sh                   ← Ejecución de Claude CLI
+│   ├── issues-board-api.sh         ← Board API wrapper (modo issues)
+│   ├── issues-fetch.sh             ← Fetch + parse de GitHub Issues
+│   ├── issues-queue.sh             ← Priorización y state por issue
+│   ├── issues-runner.sh            ← Loop de procesamiento (modo issues)
+│   └── issues-report.sh            ← Generador de morning report
 ├── templates/
 │   ├── wrapper.sh                  ← Template de wrapper Linux/Mac
 │   └── wrapper.bat                 ← Template de wrapper Windows
@@ -185,6 +190,7 @@ Si el proyecto no tiene session files, el orquestador genera prompts inline basa
 | Cambio grande | Pide descripción y ejecuta /project:cambio-grande | Nada |
 | Cambio puntual | Pide descripción y ejecuta /project:cambio | Nada |
 | Sesión libre | Abre Claude interactivo en el proyecto | Nada |
+| **Issues** | Escanea GitHub Issues del Board, implementa cada directiva y crea PR draft | `ORCH_ISSUES_REPOS` configurado, gh CLI autenticado |
 
 ### Estado persistente
 
@@ -209,6 +215,64 @@ Editá `lib/sessions.sh`, función `parse_roadmap()`. El parser busca headers `#
 |----------|---------|----------|
 | `Q_ORCH_CONFIG_DIR` | `~/.q-orchestrator` | Directorio de configuración |
 | `GITHUB_TOKEN` | (no set) | Para CI checks vía GitHub API |
+
+## Modo issues — procesar directivas del Board automáticamente
+
+El modo issues escanea repos de BUs en busca de GitHub Issues con label `board-directive`, los implementa con Claude, y crea PRs draft. Está diseñado para correr como cron nocturno sin intervención humana.
+
+### Activación
+
+```bash
+# En ~/.q-orchestrator/config.sh:
+ORCH_ISSUES_REPOS="yoyo123-lang/qautiva yoyo123-lang/qapitaliza"
+ORCH_ISSUES_MAX_PER_RUN=5        # issues por corrida (control de costos)
+ORCH_ISSUES_DRAFT_PR=true        # PRs como draft hasta revisión humana
+ORCH_BOARD_URL="https://q-company.vercel.app"  # URL del Board
+```
+
+### Requisitos adicionales
+
+- `gh` CLI instalado y autenticado (`gh auth login`)
+- Cada repo BU necesita un `.q-orchestrator.sh` con sus credenciales del Board:
+  ```bash
+  ORCH_BU_ID="cm..."
+  ORCH_BU_API_KEY="qb_qautiva_..."
+  ```
+
+### Uso
+
+```bash
+# Desde el menú (aparece solo si ORCH_ISSUES_REPOS está configurado):
+./q-orchestrator.sh
+
+# Directo desde CLI:
+./q-orchestrator.sh --project cualquier-slug --mode issues
+
+# Como cron nocturno (22:00 todos los días):
+0 22 * * * /ruta/a/q-orchestrator.sh --project mi-repo --mode issues >> ~/q-orch-issues.log 2>&1
+```
+
+### Morning report
+
+Al terminar cada corrida, el orquestador genera un reporte en:
+```
+~/.q-orchestrator/reports/morning-report-YYYY-MM-DD.md
+```
+
+Con secciones: Completados (con PR URL), Fallidos (con log y acción sugerida), Pendientes (no procesados por límite).
+
+### Troubleshooting issues mode
+
+| Problema | Solución |
+|----------|----------|
+| El modo no aparece en el menú | Verificá que `ORCH_ISSUES_REPOS` esté configurado en `~/.q-orchestrator/config.sh` |
+| "gh CLI no encontrado" | `brew install gh` o ver https://cli.github.com, luego `gh auth login` |
+| Issues no se detectan | Verificá que los issues tengan label `board-directive` y HTML comment `<!-- board:directive_id=... -->` |
+| Issue reprocesado inesperadamente | El state file puede estar corrupto — borralo: `rm ~/.q-orchestrator/issues-state/{owner_repo}/{number}.json` |
+| Board API no recibe notificación | Verificá `ORCH_BU_API_KEY` en el `.q-orchestrator.sh` del repo BU |
+| Clone falla | Verificá que gh esté autenticado con acceso al repo: `gh repo view owner/repo` |
+
+---
 
 ## Migración desde iniciar.bat
 

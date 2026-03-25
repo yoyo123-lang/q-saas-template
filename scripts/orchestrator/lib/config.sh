@@ -74,6 +74,15 @@
 # Log directory (empty = use default ~/.q-orchestrator/logs/<slug>/)
 : "${ORCH_LOG_DIR:=}"
 
+# ── Issues mode ──
+: "${ORCH_ISSUES_REPOS:=}"                    # Repos a escanear (space-separated owner/repo)
+: "${ORCH_ISSUES_MAX_PER_RUN:=5}"             # Límite por ejecución (control de costos)
+: "${ORCH_ISSUES_DRAFT_PR:=true}"             # PRs como draft
+: "${ORCH_ISSUES_WORKSPACE:=${HOME}/projects}" # Donde se clonan los repos BU
+: "${ORCH_ISSUES_REPORT_DIR:=${CONFIG_DIR}/reports}" # Directorio de morning reports
+: "${ORCH_ISSUES_LABEL:=board-directive}"     # Label que identifica issues del Board
+: "${ORCH_BOARD_URL:=https://q-company.vercel.app}" # URL base del Board
+
 # ── Claude CLI flags ──
 # Additional flags to pass to every claude invocation
 # Example: "--allowedTools 'Bash(npm:*),Edit,Write,Read'"
@@ -172,6 +181,14 @@ generate_default_config() {
 # ── Logging ──
 # ORCH_SAVE_LOGS=true            # Save session logs
 # ORCH_LOG_DIR=""                 # Custom log directory
+
+# ── Issues mode ──
+# ORCH_ISSUES_REPOS=""                  # Repos a escanear (space-separated: "owner/repo1 owner/repo2")
+# ORCH_ISSUES_MAX_PER_RUN=5             # Límite de issues por ejecución
+# ORCH_ISSUES_DRAFT_PR=true             # Crear PRs como draft
+# ORCH_ISSUES_WORKSPACE="$HOME/projects" # Directorio donde se clonan los repos BU
+# ORCH_ISSUES_LABEL="board-directive"   # Label que identifica issues del Board
+# ORCH_BOARD_URL="https://q-company.vercel.app" # URL base del Board
 CONFIGEOF
 
   echo "$target"
@@ -205,6 +222,13 @@ show_config() {
   ui_item "" "Skip perms:       ${ORCH_SKIP_PERMISSIONS}"
   ui_item "" "Verbose:          ${ORCH_VERBOSE}"
   ui_item "" "Extra flags:      ${ORCH_CLAUDE_EXTRA_FLAGS:-ninguno}"
+  ui_empty
+  ui_item "" "Issues repos:     ${ORCH_ISSUES_REPOS:-(no configurado)}"
+  ui_item "" "Issues max/run:   ${ORCH_ISSUES_MAX_PER_RUN}"
+  ui_item "" "Issues draft PR:  ${ORCH_ISSUES_DRAFT_PR}"
+  ui_item "" "Issues workspace: ${ORCH_ISSUES_WORKSPACE}"
+  ui_item "" "Issues label:     ${ORCH_ISSUES_LABEL}"
+  ui_item "" "Board URL:        ${ORCH_BOARD_URL}"
   ui_empty
 
   local global_config="${CONFIG_DIR}/config.sh"

@@ -113,6 +113,7 @@ run_ci_check_and_fix() {
   local log_dir="$4"
   local timestamp="$5"
   local session_num="$6"
+  local _current_session_name="${7:-Sesión ${session_num}}"
 
   local attempt=0
 
@@ -133,10 +134,22 @@ run_ci_check_and_fix() {
     # Check if it looks like it passed (heuristic: exit code 0)
     if [ $ci_exit -eq 0 ]; then
       telemetry_ci_attempt "$attempt" "$ORCH_CI_MAX_RETRIES" "pass"
-      # Try push
-      echo -e "  ${BOLD}▸ Push${RESET}"
-      local push_prompt="Build, lint y tests pasaron. Commiteá los cambios pendientes (si los hay) y pusheá a origin."
-      local push_exit=0
+
+      # Determine push strategy
+      local push_prompt=""
+      if [ "$ORCH_BRANCH_STRATEGY" = "pr" ]; then
+        local branch_name="session/${slug}/s${session_num}"
+        echo -e "  ${BOLD}▸ Push (branch + PR)${RESET}"
+        push_prompt="Build, lint y tests pasaron. Hacé lo siguiente en orden:
+1. Commiteá todos los cambios pendientes (si los hay)
+2. Creá y switcheá al branch '${branch_name}' (si no existe)
+3. Pusheá a origin con: git push -u origin ${branch_name}
+4. Creá un Pull Request con gh pr create --base main --head ${branch_name} --title 'S${session_num}: ${_current_session_name}' --body 'Sesión ${session_num} del roadmap - ${_current_session_name}'
+Si el branch ya existe, usá el existente. Si gh CLI no está disponible, solo pusheá."
+      else
+        echo -e "  ${BOLD}▸ Push${RESET}"
+        push_prompt="Build, lint y tests pasaron. Commiteá los cambios pendientes (si los hay) y pusheá a origin."
+      fi
 
       # Push with retries for network failures
       local push_attempt=0
@@ -152,7 +165,13 @@ run_ci_check_and_fix() {
         fi
       done
 
-      ui_ok "Build + push completado"
+      # If PR strategy, switch back to main for next session
+      if [ "$ORCH_BRANCH_STRATEGY" = "pr" ]; then
+        (cd "$project_path" && git checkout main 2>/dev/null || git checkout master 2>/dev/null) || true
+        ui_ok "PR creado en branch session/${slug}/s${session_num}"
+      else
+        ui_ok "Build + push completado"
+      fi
       return 0
     fi
 
@@ -376,7 +395,7 @@ run_session_cambio_grande() {
   save_state "$slug" "$session_num" "build-push" "running"
   telemetry_step_start "build_push" "$ORCH_MAX_TURNS_BUILD"
 
-  if run_ci_check_and_fix "$project_path" "$model" "$slug" "$log_dir" "$timestamp" "$session_num"; then
+  if run_ci_check_and_fix "$project_path" "$model" "$slug" "$log_dir" "$timestamp" "$session_num" "$session_name"; then
     telemetry_step_end "build_push" "0" "success"
     save_state "$slug" "$session_num" "completed" "completed"
     mark_session_completed "$slug" "$session_num"

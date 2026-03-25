@@ -673,17 +673,43 @@ run_mode_continue() {
   ui_info "Próxima sesión: S${next_num} — ${next_name}"
   echo ""
 
-  ui_menu "¿QUÉ HACER?" \
-    "Ejecutar S${next_num} (siguiente pendiente)" \
+  # Branch strategy info
+  local strategy_label=""
+  if [ "$ORCH_BRANCH_STRATEGY" = "pr" ]; then
+    strategy_label=" [branch + PR]"
+  fi
+
+  ui_menu "¿QUÉ HACER?${strategy_label}" \
+    "Ejecutar S${next_num} y continuar con las siguientes" \
+    "Ejecutar solo S${next_num}" \
     "Elegir sesión específica" \
-    "Ejecutar todas las pendientes (automático)" \
     "Volver"
 
   case "$MENU_CHOICE" in
     1)
-      run_session_cambio_grande "$project_path" "$next_num" "$next_name" "$model" "$slug"
+      # Auto-continue: run all pending sessions sequentially
+      echo ""
+      ui_info "Modo automático: ${#pending_indices[@]} sesiones pendientes."
+      for pidx in "${pending_indices[@]}"; do
+        local snum="${session_nums[$pidx]}"
+        local sname="${session_names[$pidx]}"
+        echo ""
+        echo -e "  ${BOLD}══════════════════════════════════════════${RESET}"
+        echo -e "  ${BOLD}  SESIÓN ${snum}: ${sname}${RESET}"
+        echo -e "  ${BOLD}══════════════════════════════════════════${RESET}"
+        echo ""
+        run_session_cambio_grande "$project_path" "$snum" "$sname" "$model" "$slug"
+      done
+      echo ""
+      ui_ok "Todas las sesiones pendientes completadas."
+      read -rp "  Presioná Enter para continuar..."
       ;;
     2)
+      run_session_cambio_grande "$project_path" "$next_num" "$next_name" "$model" "$slug"
+      echo ""
+      read -rp "  Presioná Enter para continuar..."
+      ;;
+    3)
       ui_prompt "Número de sesión:"
       read -r chosen_num
       local chosen_name=""
@@ -699,30 +725,11 @@ run_mode_continue() {
         return
       fi
       run_session_cambio_grande "$project_path" "$chosen_num" "$chosen_name" "$model" "$slug"
-      ;;
-    3)
       echo ""
-      ui_warn "Se van a ejecutar ${#pending_indices[@]} sesiones secuencialmente."
-      if ui_confirm "¿Continuar?"; then
-        for pidx in "${pending_indices[@]}"; do
-          local snum="${session_nums[$pidx]}"
-          local sname="${session_names[$pidx]}"
-          echo ""
-          echo -e "  ${BOLD}══════════════════════════════════════════${RESET}"
-          echo -e "  ${BOLD}  SESIÓN ${snum}: ${sname}${RESET}"
-          echo -e "  ${BOLD}══════════════════════════════════════════${RESET}"
-          echo ""
-          run_session_cambio_grande "$project_path" "$snum" "$sname" "$model" "$slug"
-        done
-        echo ""
-        ui_ok "Todas las sesiones completadas."
-      fi
+      read -rp "  Presioná Enter para continuar..."
       ;;
     4) return ;;
   esac
-
-  echo ""
-  read -rp "  Presioná Enter para continuar..."
 }
 
 # ── Mode: New roadmap ──

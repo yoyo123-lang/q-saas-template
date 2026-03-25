@@ -343,6 +343,7 @@ run_session_cambio_grande() {
   if run_ci_check_and_fix "$project_path" "$model" "$slug" "$log_dir" "$timestamp" "$session_num"; then
     telemetry_step_end "build_push" "0" "success"
     save_state "$slug" "$session_num" "completed" "completed"
+    mark_session_completed "$slug" "$session_num"
     telemetry_end_run "completed"
     echo ""
     echo -e "  ${GREEN}✓ Sesión ${session_num} completada${RESET}"

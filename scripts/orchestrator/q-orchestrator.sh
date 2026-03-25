@@ -408,9 +408,9 @@ show_projects() {
 
     if [ -f "${path}/ROADMAP.md" ]; then
       local pending
-      pending=$(count_pending_sessions "$path")
+      pending=$(count_pending_sessions "$path" "$slug")
       local next
-      next=$(next_pending_session "$path")
+      next=$(next_pending_session "$path" "$slug")
       ui_item "  " "Roadmap: ${pending} sesiones pendientes (próxima: ${next})"
     fi
 
@@ -504,7 +504,7 @@ select_project() {
     local label="${slug} — ${path}"
     if [ -f "${path}/ROADMAP.md" ]; then
       local pending
-      pending=$(count_pending_sessions "$path")
+      pending=$(count_pending_sessions "$path" "$slug")
       label="${label} [${pending} pendientes]"
     fi
     options+=("$label")
@@ -592,7 +592,7 @@ select_and_run_mode() {
 
   if [[ "$caps" == *"roadmap"* ]]; then
     local pending
-    pending=$(count_pending_sessions "$project_path")
+    pending=$(count_pending_sessions "$project_path" "$slug")
     options+=("Continuar roadmap (${pending} sesiones pendientes)")
     modes+=("continue")
   fi
@@ -653,7 +653,7 @@ run_mode_continue() {
       pending_indices+=("$i")
     fi
     i=$((i + 1))
-  done < <(parse_roadmap "$project_path")
+  done < <(parse_roadmap "$project_path" "$slug")
 
   ui_empty
   ui_section_end
@@ -742,6 +742,7 @@ run_mode_roadmap() {
 
   echo ""
   ui_info "Generando roadmap con Claude..."
+  reset_roadmap_progress "$slug"
   run_roadmap "$project_path" "$description" "$model"
   echo ""
   read -rp "  Presioná Enter para continuar..."
@@ -1100,7 +1101,7 @@ main_menu() {
       while IFS='|' read -r idx slug path repo branch; do
         if [ -f "${path}/ROADMAP.md" ]; then
           local pending
-          pending=$(count_pending_sessions "$path")
+          pending=$(count_pending_sessions "$path" "$slug")
           if [ "$pending" -gt 0 ]; then
             ui_info "  ${slug}: ${pending} sesiones pendientes"
           fi

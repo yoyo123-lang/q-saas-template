@@ -133,9 +133,12 @@ _parse_table_field() {
 _parse_section() {
   local body="$1"
   local heading="$2"
-  echo "$body" | awk "/^##[[:space:]]+${heading}/{found=1; next} found && /^##[[:space:]]/{found=0} found{print}" \
-    | sed '/^[[:space:]]*$/d' \
-    | head -100
+  # Use index() instead of regex so heading metacharacters don't break the match
+  echo "$body" | awk -v h="## ${heading}" '
+    index($0, h) == 1 { found=1; next }
+    found && /^## / { found=0 }
+    found { print }
+  ' | sed '/^[[:space:]]*$/d' | head -100
 }
 
 # ── Parse full issue body into structured fields ──

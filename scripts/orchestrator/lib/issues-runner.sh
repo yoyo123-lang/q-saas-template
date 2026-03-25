@@ -102,7 +102,7 @@ PROMPT
 
 # ── Create a draft PR for the directive branch ──
 # Usage: create_draft_pr <repo_path> <repo> <branch> <directive_id> <title> <issue_number>
-# Returns: PR URL in _PR_URL, PR number in _PR_NUMBER
+# Sets: _PR_URL, _PR_NUMBER (cleared to "" before each call)
 _PR_URL=""
 _PR_NUMBER=""
 create_draft_pr() {
@@ -129,6 +129,10 @@ create_draft_pr() {
 - **Branch**: \`${branch}\`
 
 > Generado automáticamente por q-orchestrator en modo issues."
+
+  # Clear globals before setting — avoids stale values from previous issues
+  _PR_URL=""
+  _PR_NUMBER=""
 
   local pr_url
   pr_url=$(cd "$repo_path" && gh pr create \
@@ -220,6 +224,82 @@ handle_issue_failure() {
     "$repo_path"
 }
 
+# ── Set up workspace for a single issue: clone, branch, decode ──
+# Usage: _setup_issue_workspace <repo> <number> <directive_id> <bu_id> <instr_b64> <req_b64> <log_dir> <run_id>
+# Sets: _REPO_LOCAL_PATH (via ensure_repo_cloned)
+# Outputs to stdout: branch_name|repo_path|instructions_b64_decoded|requirements_b64_decoded
+# Returns: 0 on success, 1 on failure (handle_issue_failure already called)
+_setup_issue_workspace() {
+  local repo="$1" number="$2" directive_id="$3" bu_id="$4"
+  local instr_b64="$5" req_b64="$6" log_dir="$7" run_id="$8"
+
+  local repo_name="${repo##*/}"
+  local workspace="${ORCH_ISSUES_WORKSPACE:-${HOME}/projects}"
+
+  # Clear global before use — avoids stale path from previous issue
+  _REPO_LOCAL_PATH=""
+
+  if ! ensure_repo_cloned "$repo" "$workspace"; then
+    handle_issue_failure "$repo" "$number" "$directive_id" "$bu_id" \
+      "" "clone_failed" "" "1" "$run_id"
+    return 1
+  fi
+  local repo_path="$_REPO_LOCAL_PATH"
+
+  mkdir -p "${log_dir}/${repo_name}"
+
+  local branch
+  branch=$(create_directive_branch "$repo_path" "$directive_id") || {
+    handle_issue_failure "$repo" "$number" "$directive_id" "$bu_id" \
+      "$repo_path" "branch_failed" "" "1" "$run_id"
+    return 1
+  }
+
+  local instructions requirements
+  instructions=$(_b64decode "$instr_b64")
+  [ -z "$instructions" ] && instructions="Ver issue #${number} en GitHub."
+  requirements=$(_b64decode "$req_b64")
+
+  # Output structured result as pipe-separated line
+  local instr_out req_out
+  instr_out=$(printf '%s' "$instructions" | base64 | tr -d '\n')
+  req_out=$(printf '%s' "$requirements"   | base64 | tr -d '\n')
+  printf '%s|%s|%s|%s\n' "$branch" "$repo_path" "$instr_out" "$req_out"
+}
+
+# ── Finalize a successfully processed issue: PR, stats, state, comment, Board ──
+# Usage: _finalize_issue_success <repo> <number> <directive_id> <bu_id> <repo_path>
+#                                <branch> <last_ci_log> <run_id>
+_finalize_issue_success() {
+  local repo="$1" number="$2" directive_id="$3" bu_id="$4"
+  local repo_path="$5" branch="$6" last_ci_log="$7" run_id="$8"
+
+  create_draft_pr "$repo_path" "$repo" "$branch" "$directive_id" \
+    "$(basename "$branch")" "$number"
+  local pr_url="$_PR_URL"
+  local pr_number="$_PR_NUMBER"
+
+  local commits files_changed
+  commits=$(cd "$repo_path" && git log "main..${branch}" --oneline 2>/dev/null \
+    | wc -l | tr -d ' ') || commits=0
+  files_changed=$(cd "$repo_path" && git diff --name-only "main..${branch}" 2>/dev/null \
+    | wc -l | tr -d ' ') || files_changed=0
+
+  mark_issue_done "$repo" "$number" "completed" "$pr_url" "$last_ci_log" "1"
+  comment_on_issue "$repo" "$number" "completed" "$pr_url" ""
+
+  local result_json
+  result_json=$(build_completed_result_json \
+    "$pr_url" "${pr_number:-0}" "$branch" \
+    "$commits" "$files_changed" "0" "$run_id")
+  update_directive_status "$bu_id" "$directive_id" "completed" \
+    "PR draft creado. ${commits} commits, ${files_changed} archivos, tests pasando." \
+    "$result_json" "$repo_path"
+
+  echo ""
+  ui_ok "Issue #${number} completado → ${pr_url:-branch ${branch}}"
+}
+
 # ── Process a single issue ──
 # Usage: process_single_issue <queue_record> <run_id> <model> <log_dir>
 # Queue record format: repo|number|directive_id|bu_id|type|priority|deadline|title|instr_b64|req_b64
@@ -229,7 +309,6 @@ process_single_issue() {
   local model="$3"
   local log_dir="$4"
 
-  # Parse record fields
   local repo number directive_id bu_id type priority deadline title instr_b64 req_b64
   IFS='|' read -r repo number directive_id bu_id type priority deadline title instr_b64 req_b64 <<< "$record"
 
@@ -244,51 +323,32 @@ process_single_issue() {
   ui_section_end
   echo ""
 
-  # ── Mark started ──
   mark_issue_started "$repo" "$number" "$directive_id" "$run_id"
-
-  # ── Notify Board: in_progress ──
-  local repo_path=""
-  # We don't have repo_path yet; will get it after clone
   update_directive_status "$bu_id" "$directive_id" "in_progress" \
     "Iniciando implementación en q-orchestrator." "null" ""
 
-  # ── Clone / update repo ──
-  local workspace="${ORCH_ISSUES_WORKSPACE:-${HOME}/projects}"
-  if ! ensure_repo_cloned "$repo" "$workspace"; then
-    handle_issue_failure "$repo" "$number" "$directive_id" "$bu_id" \
-      "" "clone_failed" "" "1" "$run_id"
-    return 1
-  fi
-  repo_path="$_REPO_LOCAL_PATH"
+  # ── Workspace: clone + branch + decode ──
+  local workspace_out
+  workspace_out=$(_setup_issue_workspace \
+    "$repo" "$number" "$directive_id" "$bu_id" \
+    "$instr_b64" "$req_b64" "$log_dir" "$run_id") || return 1
+
+  local branch repo_path instr_decoded_b64 req_decoded_b64
+  IFS='|' read -r branch repo_path instr_decoded_b64 req_decoded_b64 <<< "$workspace_out"
 
   local issue_log_dir="${log_dir}/${repo_name}"
-  mkdir -p "$issue_log_dir"
-
-  # ── Create directive branch ──
-  local branch
-  branch=$(create_directive_branch "$repo_path" "$directive_id") || {
-    handle_issue_failure "$repo" "$number" "$directive_id" "$bu_id" \
-      "$repo_path" "branch_failed" "" "1" "$run_id"
-    return 1
-  }
-
-  # ── Decode instructions and requirements (portable: Linux -d / macOS -D) ──
   local instructions requirements
-  instructions=$(_b64decode "$instr_b64")
-  [ -z "$instructions" ] && instructions="Ver issue #${number} en GitHub."
-  requirements=$(_b64decode "$req_b64")
+  instructions=$(_b64decode "$instr_decoded_b64")
+  requirements=$(_b64decode "$req_decoded_b64")
 
-  # ── Build implementation prompt ──
+  # ── Implementation ──
   local impl_prompt
   impl_prompt=$(build_implementation_prompt "$type" "$priority" "$deadline" \
     "$instructions" "$requirements")
 
-  # ── Run implementation via run_claude() ──
   ui_info "Implementando directiva ${directive_id}..."
   local impl_log="${issue_log_dir}/${timestamp}-${directive_id}-implement.log"
   local impl_exit=0
-
   run_claude "$repo_path" "$impl_prompt" "$model" \
     "$ORCH_MAX_TURNS_IMPLEMENT" "$impl_log" || impl_exit=$?
 
@@ -298,13 +358,9 @@ process_single_issue() {
     return 1
   fi
 
-  # ── CI check, fix and push via run_ci_check_and_fix() ──
-  # Use "direct" strategy: we already checked out directive/{id} branch.
-  # Claude will push to the current branch (directive/{id}) directly.
-  # The PR is created separately by create_draft_pr() below.
+  # ── CI + push (direct strategy — Claude pushes to current directive branch) ──
   local directive_slug
   directive_slug=$(echo "$directive_id" | tr '[:upper:]' '[:lower:]' | tr -cd 'a-z0-9-')
-
   local orig_branch_strategy="$ORCH_BRANCH_STRATEGY"
   ORCH_BRANCH_STRATEGY="direct"
 
@@ -313,7 +369,6 @@ process_single_issue() {
   run_ci_check_and_fix "$repo_path" "$model" "$directive_slug" \
     "$issue_log_dir" "$timestamp" "1" "${title}" || ci_exit=$?
 
-  # Restore
   ORCH_BRANCH_STRATEGY="$orig_branch_strategy"
 
   local last_ci_log
@@ -325,34 +380,10 @@ process_single_issue() {
     return 1
   fi
 
-  # ── Create draft PR ──
-  create_draft_pr "$repo_path" "$repo" "$branch" "$directive_id" "$title" "$number"
-  local pr_url="$_PR_URL"
-  local pr_number="$_PR_NUMBER"
-
-  # ── Gather git stats ──
-  local commits files_changed
-  commits=$(cd "$repo_path" && git log "main..${branch}" --oneline 2>/dev/null | wc -l | tr -d ' ' || echo "0")
-  files_changed=$(cd "$repo_path" && git diff --name-only "main..${branch}" 2>/dev/null | wc -l | tr -d ' ' || echo "0")
-
-  # ── Mark done ──
-  mark_issue_done "$repo" "$number" "completed" "$pr_url" "$last_ci_log" "1"
-
-  # ── Comment on issue ──
-  comment_on_issue "$repo" "$number" "completed" "$pr_url" ""
-
-  # ── Notify Board: completed ──
-  local result_json
-  result_json=$(build_completed_result_json \
-    "$pr_url" "${pr_number:-0}" "$branch" \
-    "$commits" "$files_changed" "0" "$run_id")
-  update_directive_status "$bu_id" "$directive_id" "completed" \
-    "PR draft creado. ${commits} commits, ${files_changed} archivos, tests pasando." \
-    "$result_json" "$repo_path"
-
-  echo ""
-  ui_ok "Issue #${number} completado → ${pr_url:-branch ${branch}}"
-  return 0
+  # ── Finalize: PR + stats + state + comment + Board ──
+  _finalize_issue_success \
+    "$repo" "$number" "$directive_id" "$bu_id" \
+    "$repo_path" "$branch" "$last_ci_log" "$run_id"
 }
 
 # ══════════════════════════════════════════════════════════════

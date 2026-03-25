@@ -43,27 +43,27 @@ Revisó: Claude Code — roles: Code Reviewer, QA Engineer, Security Auditor, De
 - Riesgo: Errores en cascada entre issues del mismo repo en una misma corrida.
 - Solución: En `ensure_repo_cloned`, hacer `git checkout main && git reset --hard origin/main` antes del pull. En `handle_issue_failure`, resetear el repo al estado limpio.
 
-### [MEDIO] `process_single_issue` tiene 129 líneas (30+ líneas recomendado por rol)
+### [MEDIO] ~~`process_single_issue` tiene 129 líneas~~ — ✅ RESUELTO
 - Dónde: `lib/issues-runner.sh:202-344`
 - Problema: La función hace 12 cosas distintas: parse, clone, branch, decode, prompt, implement, CI, PR, stats, state, comment, board. Difícil de testear y debuggear.
 - Solución: Extraer sub-funciones. Mínimo: `_prepare_issue_workspace()` y `_finalize_issue_success()`.
 
-### [MEDIO] Variables globales `_REPO_LOCAL_PATH`, `_PR_URL`, `_PR_NUMBER` sin namespacing
+### [MEDIO] ~~Variables globales `_REPO_LOCAL_PATH`, `_PR_URL`, `_PR_NUMBER` sin namespacing~~ — ✅ RESUELTO
 - Dónde: `lib/issues-runner.sh:22, 103-104`
 - Problema: Si el loop de issues en `run_issues_mode` se paralelizara con `&`, estas variables se pisarían entre procesos. Además, si `create_draft_pr` falla en un issue y tiene el `_PR_URL` de un issue anterior, el estado incorrecto se registra.
 - Solución: Usar `local` variables o verificar que se limpien explícitamente antes de cada call.
 
-### [MEDIO] JSON payload del Board API con escaping incompleto
+### [MEDIO] ~~JSON payload del Board API con escaping incompleto~~ — ✅ RESUELTO
 - Dónde: `lib/issues-board-api.sh:94`
 - Problema: `notes_escaped` solo escapa comillas y newlines. Si `result_json` contiene comillas sin escapar (ej. ramas con caracteres raros), el JSON del PATCH puede ser inválido. Board API recibiría un request malformado.
 - Solución: Validar que `result_json` sea JSON válido antes de insertar, o construirlo siempre con los builders del mismo archivo.
 
-### [MEDIO] Fallo silencioso en state files JSON corrompidos
+### [MEDIO] ~~Fallo silencioso en state files JSON corrompidos~~ — ✅ RESUELTO
 - Dónde: `lib/issues-queue.sh:63-67` (`is_issue_already_processed`)
 - Problema: Si el state file está corrupto/incompleto, el grep retorna vacío, la condición `[ "$status" = "completed" ]` es false, y el issue se reprocesa. No hay log de advertencia.
 - Solución: Agregar `ui_warn` si el state file existe pero el status no se pudo parsear.
 
-### [BAJO] `_parse_section` en awk usa `$heading` sin escapar metacaracteres regex
+### [BAJO] ~~`_parse_section` en awk usa `$heading` sin escapar metacaracteres regex~~ — ✅ RESUELTO
 - Dónde: `lib/issues-fetch.sh:102`
 - Problema: Si el heading contiene `(`, `)`, `.`, `*`, etc., el patrón awk falla o matchea incorrectamente. "Requisitos de implementación" no tiene este problema, pero futuros headings podrían tenerlo.
 - Solución: Escapar `$heading` con `gsub` en awk o usar `index()` en lugar de regex.

@@ -126,8 +126,14 @@ build_completed_result_json() {
   local tests_added="${6:-0}"
   local run_id="$7"
 
+  # Escape string values: backslashes first, then double quotes
+  local pr_url_esc branch_esc run_id_esc
+  pr_url_esc=$(printf '%s' "$pr_url"  | sed 's/\\/\\\\/g; s/"/\\"/g')
+  branch_esc=$(printf '%s' "$branch"  | sed 's/\\/\\\\/g; s/"/\\"/g')
+  run_id_esc=$(printf '%s' "$run_id"  | sed 's/\\/\\\\/g; s/"/\\"/g')
+
   printf '{"pr_url":"%s","pr_number":%s,"branch":"%s","commits":%s,"files_changed":%s,"tests_added":%s,"run_id":"%s"}' \
-    "$pr_url" "$pr_number" "$branch" "$commits" "$files_changed" "$tests_added" "$run_id"
+    "$pr_url_esc" "$pr_number" "$branch_esc" "$commits" "$files_changed" "$tests_added" "$run_id_esc"
 }
 
 # ── Build result JSON for failed directive ──
@@ -138,10 +144,12 @@ build_failed_result_json() {
   local attempts="${3:-1}"
   local run_id="$4"
 
-  # Escape paths for JSON
-  local log_escaped
-  log_escaped=$(printf '%s' "$last_log" | sed 's/"/\\"/g')
+  # Escape string values: backslashes first, then double quotes
+  local log_escaped error_escaped run_id_esc
+  log_escaped=$(printf '%s' "$last_log"    | sed 's/\\/\\\\/g; s/"/\\"/g')
+  error_escaped=$(printf '%s' "$error_type" | sed 's/\\/\\\\/g; s/"/\\"/g')
+  run_id_esc=$(printf '%s' "$run_id"        | sed 's/\\/\\\\/g; s/"/\\"/g')
 
   printf '{"error":"%s","last_log":"%s","attempts":%s,"run_id":"%s"}' \
-    "$error_type" "$log_escaped" "$attempts" "$run_id"
+    "$error_escaped" "$log_escaped" "$attempts" "$run_id_esc"
 }

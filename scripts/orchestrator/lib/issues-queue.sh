@@ -64,6 +64,13 @@ is_issue_already_processed() {
   status=$(grep -o '"status"[[:space:]]*:[[:space:]]*"[^"]*"' "$state_file" \
     | sed 's/.*"status"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/')
 
+  # Warn if file exists but status couldn't be parsed (corrupted state file)
+  if [ -z "$status" ]; then
+    ui_warn "State file existe pero status no se pudo parsear: ${state_file}"
+    ui_warn "El issue será reprocesado. Borrá el archivo si querés resetear."
+    return 1
+  fi
+
   [ "$status" = "completed" ]
 }
 

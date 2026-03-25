@@ -2,27 +2,25 @@
 # ── Claude CLI runner for q-orchestrator ──
 # All settings come from lib/config.sh (ORCH_* variables)
 
-# ── Build claude command with common flags ──
+# ── Build claude command array in caller's scope ──
+# Sets: _CLAUDE_CMD array (must be declared by caller or used after call)
 _build_claude_cmd() {
   local prompt="$1"
   local model="$2"
   local max_turns="$3"
 
-  local cmd=(claude -p "$prompt" --model "$model" --max-turns "$max_turns")
+  _CLAUDE_CMD=(claude -p "$prompt" --model "$model" --max-turns "$max_turns")
 
   # Permission skipping (for CI/trusted environments)
   if [ "$ORCH_SKIP_PERMISSIONS" = "true" ]; then
-    cmd+=(--dangerously-skip-permissions)
+    _CLAUDE_CMD+=(--dangerously-skip-permissions)
   fi
 
   # Extra flags
   if [ -n "$ORCH_CLAUDE_EXTRA_FLAGS" ]; then
-    # Split extra flags by spaces (respecting quotes would need eval, keep simple)
     read -ra extra <<< "$ORCH_CLAUDE_EXTRA_FLAGS"
-    cmd+=("${extra[@]}")
+    _CLAUDE_CMD+=("${extra[@]}")
   fi
-
-  echo "${cmd[@]}"
 }
 
 # ── Run claude in prompt mode ──
@@ -34,15 +32,14 @@ run_claude() {
   local max_turns="${4:-$ORCH_MAX_TURNS_IMPLEMENT}"
   local log_file="${5:-}"
 
-  local cmd
-  cmd=$(_build_claude_cmd "$prompt" "$model" "$max_turns")
+  _build_claude_cmd "$prompt" "$model" "$max_turns"
 
   local exit_code=0
   if [ -n "$log_file" ] && [ "$ORCH_SAVE_LOGS" = "true" ]; then
     mkdir -p "$(dirname "$log_file")"
-    (cd "$project_path" && eval "$cmd" 2>&1 | tee "$log_file") || exit_code=$?
+    (cd "$project_path" && "${_CLAUDE_CMD[@]}" 2>&1 | tee "$log_file") || exit_code=$?
   else
-    (cd "$project_path" && eval "$cmd" 2>&1) || exit_code=$?
+    (cd "$project_path" && "${_CLAUDE_CMD[@]}" 2>&1) || exit_code=$?
   fi
 
   return $exit_code

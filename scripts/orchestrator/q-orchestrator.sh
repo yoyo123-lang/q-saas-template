@@ -141,7 +141,7 @@ run_diagnostic() {
   if [ "$count" -gt 0 ]; then
     ui_section "PROYECTOS REGISTRADOS"
     ui_empty
-    while IFS='|' read -r idx slug path repo branch; do
+    while IFS='|' read -r idx slug path repo branch branch_strategy; do
       local caps
       caps=$(detect_capabilities "$path")
       ui_item "${idx}." "${slug} → ${path}"
@@ -371,8 +371,16 @@ register_project() {
   read -r branch
   [ -z "$branch" ] && branch="main"
 
+  echo ""
+  ui_prompt "Estrategia de branches:"
+  echo "    [1] direct — push directo a ${branch:-main} (proyectos sin producción)"
+  echo "    [2] pr     — branch por sesión + Pull Request (proyectos en producción)"
+  read -r strategy_choice
+  local branch_strategy="direct"
+  [ "$strategy_choice" = "2" ] && branch_strategy="pr"
+
   local result
-  result=$(add_project "$slug" "$path" "$repo" "$branch")
+  result=$(add_project "$slug" "$path" "$repo" "$branch" "$branch_strategy")
 
   if [ "$result" = "OK" ]; then
     ui_ok "Proyecto '${slug}' registrado."
@@ -401,11 +409,12 @@ show_projects() {
   ui_section "PROYECTOS REGISTRADOS"
   ui_empty
 
-  while IFS='|' read -r idx slug path repo branch; do
+  while IFS='|' read -r idx slug path repo branch branch_strategy; do
     ui_item "${idx}." "${slug}"
     ui_item "  " "Path: ${path}"
     [ -n "$repo" ] && ui_item "  " "Repo: ${repo}"
     ui_item "  " "Branch: ${branch}"
+    ui_item "  " "Strategy: ${branch_strategy:-direct}"
 
     local caps
     caps=$(detect_capabilities "$path")
@@ -471,16 +480,20 @@ SELECTED_SLUG=""
 SELECTED_PATH=""
 SELECTED_REPO=""
 SELECTED_BRANCH=""
+SELECTED_BRANCH_STRATEGY=""
+SELECTED_IDX=""
 
 select_project() {
   if [ -n "$ARG_PROJECT" ]; then
     # Find by slug from CLI arg
-    while IFS='|' read -r idx slug path repo branch; do
+    while IFS='|' read -r idx slug path repo branch branch_strategy; do
       if [ "$slug" = "$ARG_PROJECT" ]; then
+        SELECTED_IDX=$((idx - 1))
         SELECTED_SLUG="$slug"
         SELECTED_PATH="$path"
         SELECTED_REPO="$repo"
         SELECTED_BRANCH="$branch"
+        SELECTED_BRANCH_STRATEGY="$branch_strategy"
         return 0
       fi
     done < <(list_projects)
@@ -504,9 +517,12 @@ select_project() {
   local paths=()
   local repos=()
   local branches=()
+  local branch_strategies=()
 
-  while IFS='|' read -r idx slug path repo branch; do
-    local label="${slug} — ${path}"
+  while IFS='|' read -r idx slug path repo branch branch_strategy; do
+    local strategy_tag=""
+    [ "$branch_strategy" = "pr" ] && strategy_tag=" [PR]"
+    local label="${slug}${strategy_tag} — ${path}"
     if [ -f "${path}/ROADMAP.md" ]; then
       local pending
       pending=$(count_pending_sessions "$path" "$slug")
@@ -517,15 +533,18 @@ select_project() {
     paths+=("$path")
     repos+=("$repo")
     branches+=("$branch")
+    branch_strategies+=("$branch_strategy")
   done < <(list_projects)
 
   ui_menu "SELECCIONAR PROYECTO" "${options[@]}"
   local idx=$((MENU_CHOICE - 1))
 
+  SELECTED_IDX="$idx"
   SELECTED_SLUG="${slugs[$idx]}"
   SELECTED_PATH="${paths[$idx]}"
   SELECTED_REPO="${repos[$idx]}"
   SELECTED_BRANCH="${branches[$idx]}"
+  SELECTED_BRANCH_STRATEGY="${branch_strategies[$idx]}"
 
   return 0
 }
@@ -572,6 +591,39 @@ select_and_run_mode() {
 
   # ── Load project-specific config overrides ──
   load_project_config "$project_path"
+
+  # ── Override branch strategy from project registration ──
+  if [ -n "$SELECTED_BRANCH_STRATEGY" ]; then
+    ORCH_BRANCH_STRATEGY="$SELECTED_BRANCH_STRATEGY"
+  fi
+
+  # ── Show current strategy and offer to change ──
+  local strategy_display="direct (push a ${SELECTED_BRANCH:-main})"
+  [ "$ORCH_BRANCH_STRATEGY" = "pr" ] && strategy_display="pr (branch por sesión + Pull Request)"
+  echo ""
+  ui_info "Estrategia de branch: ${strategy_display}"
+
+  if [ -z "$ARG_MODE" ]; then
+    # Only offer to change in interactive mode
+    read -rp "  ¿Cambiar? [s/N]: " change_strategy
+    if [[ "$change_strategy" =~ ^[sS]$ ]]; then
+      echo "    [1] direct — push directo a ${SELECTED_BRANCH:-main}"
+      echo "    [2] pr     — branch por sesión + Pull Request"
+      read -r new_strategy_choice
+      if [ "$new_strategy_choice" = "1" ]; then
+        ORCH_BRANCH_STRATEGY="direct"
+        SELECTED_BRANCH_STRATEGY="direct"
+      elif [ "$new_strategy_choice" = "2" ]; then
+        ORCH_BRANCH_STRATEGY="pr"
+        SELECTED_BRANCH_STRATEGY="pr"
+      fi
+      # Persist to projects.json
+      if [ -n "$SELECTED_IDX" ]; then
+        update_project_field "$SELECTED_IDX" "branch_strategy" "$ORCH_BRANCH_STRATEGY"
+        ui_ok "Estrategia actualizada a '${ORCH_BRANCH_STRATEGY}' y guardada."
+      fi
+    fi
+  fi
 
   # ── Override model from config if user didn't pick via CLI ──
   if [ -z "$ARG_MODEL" ] && [ "$model" = "claude-sonnet-4-6" ]; then
@@ -1046,7 +1098,7 @@ Reglas:
       # Single project analysis
       local options=()
       local slugs=()
-      while IFS='|' read -r idx slug path repo branch; do
+      while IFS='|' read -r idx slug path repo branch branch_strategy; do
         options+=("${slug}")
         slugs+=("${slug}")
       done < <(list_projects)
@@ -1117,7 +1169,7 @@ main_menu() {
     # Show projects with pending work
     if [ "$count" -gt 0 ]; then
       echo ""
-      while IFS='|' read -r idx slug path repo branch; do
+      while IFS='|' read -r idx slug path repo branch branch_strategy; do
         if [ -f "${path}/ROADMAP.md" ]; then
           local pending
           pending=$(count_pending_sessions "$path" "$slug")
@@ -1237,7 +1289,7 @@ export_single_project() {
   # Build options
   local options=()
   local slugs=()
-  while IFS='|' read -r idx slug path repo branch; do
+  while IFS='|' read -r idx slug path repo branch branch_strategy; do
     options+=("${slug}")
     slugs+=("${slug}")
   done < <(list_projects)

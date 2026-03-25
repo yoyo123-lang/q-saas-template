@@ -63,14 +63,14 @@ list_projects() {
     "const fs=require('fs');
 const data=JSON.parse(fs.readFileSync('$pf','utf8'));
 data.projects.forEach((p,i)=>{
-  console.log((i+1)+'|'+p.slug+'|'+p.path+'|'+(p.repo||'')+'|'+(p.branch||'main'));
+  console.log((i+1)+'|'+p.slug+'|'+p.path+'|'+(p.repo||'')+'|'+(p.branch||'main')+'|'+(p.branch_strategy||'direct'));
 });" \
     "
 import json
 with open('$pf') as f:
     data = json.load(f)
 for i, p in enumerate(data['projects']):
-    print(f\"{i+1}|{p['slug']}|{p['path']}|{p.get('repo','')}|{p.get('branch','main')}\")
+    print(f\"{i+1}|{p['slug']}|{p['path']}|{p.get('repo','')}|{p.get('branch','main')}|{p.get('branch_strategy','direct')}\")
 "
 }
 
@@ -100,7 +100,7 @@ print(data['projects'][$idx].get('$field',''))
 
 # ── Add project ──
 add_project() {
-  local slug="$1" path="$2" repo="${3:-}" branch="${4:-main}"
+  local slug="$1" path="$2" repo="${3:-}" branch="${4:-main}" branch_strategy="${5:-direct}"
   ensure_config
 
   if [ ! -d "$path" ]; then
@@ -117,7 +117,7 @@ add_project() {
     "const fs=require('fs');
 const d=JSON.parse(fs.readFileSync('$pf','utf8'));
 if(d.projects.some(p=>p.slug==='$slug')){console.log('DUPLICATE');process.exit(0);}
-d.projects.push({slug:'$slug',path:'$native_path',repo:'$repo',branch:'$branch'});
+d.projects.push({slug:'$slug',path:'$native_path',repo:'$repo',branch:'$branch',branch_strategy:'$branch_strategy'});
 fs.writeFileSync('$pf',JSON.stringify(d,null,2));
 console.log('OK');" \
     "
@@ -132,7 +132,8 @@ data['projects'].append({
     'slug': '$slug',
     'path': '$native_path',
     'repo': '$repo',
-    'branch': '$branch'
+    'branch': '$branch',
+    'branch_strategy': '$branch_strategy'
 })
 with open('$pf', 'w') as f:
     json.dump(data, f, indent=2)
@@ -159,6 +160,32 @@ removed = data['projects'].pop($idx)
 with open('$pf', 'w') as f:
     json.dump(data, f, indent=2)
 print(removed['slug'])
+"
+}
+
+# ── Update a single field of a project by index (0-based) ──
+update_project_field() {
+  local idx="$1" field="$2" value="$3"
+  ensure_config
+  local pf; pf=$(_pf)
+  _run_json \
+    "const fs=require('fs');
+const d=JSON.parse(fs.readFileSync('$pf','utf8'));
+if(!d.projects[$idx]){console.log('NOT_FOUND');process.exit(0);}
+d.projects[$idx]['$field']='$value';
+fs.writeFileSync('$pf',JSON.stringify(d,null,2));
+console.log('OK');" \
+    "
+import json
+with open('$pf') as f:
+    data = json.load(f)
+if $idx >= len(data['projects']):
+    print('NOT_FOUND')
+    exit(0)
+data['projects'][$idx]['$field'] = '$value'
+with open('$pf', 'w') as f:
+    json.dump(data, f, indent=2)
+print('OK')
 "
 }
 

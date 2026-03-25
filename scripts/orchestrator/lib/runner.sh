@@ -11,9 +11,14 @@ _build_claude_cmd() {
 
   _CLAUDE_CMD=(claude -p "$prompt" --model "$model" --max-turns "$max_turns")
 
-  # Permission skipping (for CI/trusted environments)
+  # Permission skipping — required for unattended execution
   if [ "$ORCH_SKIP_PERMISSIONS" = "true" ]; then
     _CLAUDE_CMD+=(--dangerously-skip-permissions)
+  fi
+
+  # Verbose mode — show tool calls and progress
+  if [ "$ORCH_VERBOSE" = "true" ]; then
+    _CLAUDE_CMD+=(--verbose)
   fi
 
   # Extra flags

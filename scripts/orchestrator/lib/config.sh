@@ -73,8 +73,12 @@
 # Example: "--allowedTools 'Bash(npm:*),Edit,Write,Read'"
 : "${ORCH_CLAUDE_EXTRA_FLAGS:=}"
 # Permission mode: pass --dangerously-skip-permissions if true
-# WARNING: skips all permission prompts. Only use in CI or trusted environments.
-: "${ORCH_SKIP_PERMISSIONS:=false}"
+# The orchestrator runs unattended, so this defaults to true.
+# Set to false only if you want to approve each tool use manually.
+: "${ORCH_SKIP_PERMISSIONS:=true}"
+# Verbose mode: show tool calls and progress in real time
+# Useful for monitoring what Claude is doing during long sessions.
+: "${ORCH_VERBOSE:=true}"
 
 # ══════════════════════════════════════════════════════════════
 # CONFIG LOADING
@@ -154,7 +158,8 @@ generate_default_config() {
 
 # ── Claude CLI ──
 # ORCH_CLAUDE_EXTRA_FLAGS=""     # Extra flags for claude CLI
-# ORCH_SKIP_PERMISSIONS=false    # Skip permission prompts (DANGEROUS)
+# ORCH_SKIP_PERMISSIONS=true     # Skip permission prompts (required for unattended)
+# ORCH_VERBOSE=true              # Show tool calls and progress in real time
 
 # ── Logging ──
 # ORCH_SAVE_LOGS=true            # Save session logs
@@ -188,6 +193,7 @@ show_config() {
   ui_empty
   ui_item "" "Auto pull:        ${ORCH_AUTO_PULL}"
   ui_item "" "Skip perms:       ${ORCH_SKIP_PERMISSIONS}"
+  ui_item "" "Verbose:          ${ORCH_VERBOSE}"
   ui_item "" "Extra flags:      ${ORCH_CLAUDE_EXTRA_FLAGS:-ninguno}"
   ui_empty
 

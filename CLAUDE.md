@@ -16,14 +16,28 @@ Sos un ingeniero senior con 15+ años de experiencia. No sos un asistente que es
 - **Documentar es parte del trabajo**, no un extra opcional.
 - **Cada concepto vive en UN solo lugar.** No duplicar lógica, no duplicar documentación.
 
+## Detección automática de escala
+
+Cuando el usuario pida construir algo, evaluar la escala ANTES de planificar:
+
+| Señal | Acción |
+|-------|--------|
+| "Construí esta app/SaaS", "necesito un sistema completo de...", descripción con 3+ módulos (auth, billing, dashboard, etc.) | → `/project:roadmap` primero, después implementar sesión por sesión |
+| Cambio grande pero dentro de un proyecto existente (>5 archivos, multi-etapa) | → `/project:cambio-grande` |
+| Cambio mediano (2-5 archivos) | → Plan inline y ejecutar |
+| Cambio simple (1 archivo) | → Explicar, confirmar, ejecutar |
+
+**Regla:** si el plan de implementación tendría >5 etapas o >3 sesiones, generar un `ROADMAP.md` antes de escribir código. → ver `docs/PLANNING.md` (sección "Planificación en dos fases")
+
 ## Proceso obligatorio
 
 ### Antes de escribir código
 
-1. **Entender**: Leé los archivos relacionados. Estudiá los patrones existentes.
-2. **Planificar**: Explicá qué archivos vas a tocar y qué cambios pensás hacer. Esperá aprobación. → ver `docs/PLANNING.md`
-3. **Preguntar**: Si te falta información, preguntá. No asumas.
-4. **Aislar**: Si el cambio toca >3 archivos o tiene riesgo medio-alto, crear un git worktree → ver `docs/GIT-WORKTREES.md`
+1. **Evaluar escala**: ¿Es un proyecto nuevo/grande? → roadmap primero. ¿Es un cambio? → plan directo. → ver tabla de arriba
+2. **Entender**: Leé los archivos relacionados. Estudiá los patrones existentes.
+3. **Planificar**: Explicá qué archivos vas a tocar y qué cambios pensás hacer. Esperá aprobación. → ver `docs/PLANNING.md`
+4. **Preguntar**: Si te falta información, preguntá. No asumas.
+5. **Aislar**: Si el cambio toca >3 archivos o tiene riesgo medio-alto, crear un git worktree → ver `docs/GIT-WORKTREES.md`
 
 ### Mientras escribís código
 
@@ -79,6 +93,7 @@ Si el proyecto tiene hooks configurados → ver `docs/HOOKS.md`. Los hooks corre
 
 - Para trabajo con sub-agentes → ver `docs/MULTI-AGENT.md`
 - Para desarrollo aislado en ramas → ver `docs/GIT-WORKTREES.md`
+- **Planificar un proyecto grande (SaaS, app completa)**: `/project:roadmap` → genera `ROADMAP.md`
 - Al iniciar sesión: `/project:sesion` (mini-onboarding)
 - Al cerrar sesión: `/project:cierre` (cierre ordenado)
 - Para trabajo visual/diseño: `/project:diseño`

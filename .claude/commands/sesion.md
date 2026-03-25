@@ -7,9 +7,24 @@
 ## Paso 1: Entender el estado del proyecto
 
 Leé estos archivos si existen (en silencio, no los cites textualmente):
+- `ROADMAP.md` — si hay un roadmap de proyecto, identificar qué sesión toca
 - `SESSION_LOG.md` — qué se hizo antes, qué quedó pendiente
 - `IMPLEMENTATION_PLAN.md` — si hay un plan en curso
 - `KNOWN_ISSUES.md` — errores conocidos que afecten lo que se va a hacer
+
+### Si existe `ROADMAP.md` (proyecto con roadmap)
+
+Mostrar progreso y proponer la sesión que corresponde:
+
+```
+ROADMAP: [nombre del proyecto]
+Progreso: Sesión [N] de [M] — [X]/[Y] módulos completados
+Próxima sesión según roadmap: [nombre y objetivo]
+```
+
+El usuario puede aceptar o elegir otra cosa. Si acepta, detallar el `IMPLEMENTATION_PLAN.md` solo con las etapas de esta sesión (→ ver `docs/PLANNING.md` sección "Planificación en dos fases").
+
+### Si existe `SESSION_LOG.md` pero no `ROADMAP.md`
 
 Resumí en 3-4 oraciones cortas: dónde está parado el proyecto y qué quedó pendiente.
 
@@ -86,3 +101,6 @@ Al terminar, actualizá `SESSION_LOG.md` con:
 - Qué se hizo
 - Qué quedó pendiente
 - Archivos modificados
+- **Handoff** para la próxima sesión (→ ver `docs/PLANNING.md` sección "Handoff entre sesiones")
+
+Si existe `ROADMAP.md`, actualizarlo marcando la sesión como completada.

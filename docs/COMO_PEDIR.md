@@ -73,6 +73,25 @@ Referencia visual: [LINK a un sitio que te guste como se ve].
 Keywords principales: [2-3 keywords de SEO que querés atacar].
 ```
 
+### Proyecto completo / SaaS nuevo
+
+```
+Necesito que construyas [TIPO DE APP: SaaS, plataforma, sistema] para [QUIÉN LO USA].
+Resuelve: [PROBLEMA en 1-2 oraciones].
+Funcionalidades core: [LISTA de 3-5 cosas que sí o sí tiene que tener].
+Integraciones: [pagos, email, notificaciones, APIs externas, etc.].
+Referencia: [app o sitio que se parezca a lo que querés, si tenés].
+```
+
+**Ejemplo real:**
+"Necesito que construyas un SaaS de gestión de turnos para consultorios médicos.
+Resuelve: los pacientes pueden sacar turnos online y el médico los ve en un calendario.
+Funcionalidades core: calendario de turnos, reserva online, recordatorios por email, panel admin.
+Integraciones: Google Calendar, envío de emails con Resend.
+Referencia: algo similar a Calendly pero más simple."
+
+> Claude Code va a detectar automáticamente que esto necesita un **roadmap** (`/project:roadmap`) antes de implementar. No hace falta pedirlo explícitamente.
+
 ### Funcionalidad compleja o que no tenés del todo clara
 
 ```
@@ -127,6 +146,7 @@ Restricción: no tocar [QUÉ ARCHIVOS o funcionalidad no debe cambiar].
 | Situación | Herramienta |
 |---|---|
 | Tengo una idea pero no sé bien cómo formularla | Claude.ai (esta conversación) |
+| Quiero construir una app/SaaS completa | `/project:roadmap` en Claude Code (se detecta automáticamente) |
 | Ya sé qué quiero pero es algo complejo | `/project:sesion` en Claude Code |
 | Ya sé qué quiero y es algo puntual | Prompt directo en Claude Code |
 | Quiero una pantalla pero no sé cómo debería verse | `/project:diseño` en Claude Code |

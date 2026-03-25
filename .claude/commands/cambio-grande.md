@@ -5,6 +5,20 @@
 > Invocar con: `/project:cambio-grande`
 > Para cambios chicos (1 etapa), usar `/project:cambio`.
 
+## Paso 0: Evaluar si necesita roadmap primero
+
+Antes de planificar, evaluar la escala del pedido:
+
+- Si el usuario describe un **proyecto completo** (app, SaaS, sistema con 3+ módulos) y NO existe `ROADMAP.md` → sugerir `/project:roadmap` primero
+- Si ya existe `ROADMAP.md` → leerlo y trabajar sobre la sesión que corresponde
+- Si es un cambio grande dentro de un proyecto existente → continuar con este skill
+
+```
+⚠️ Este pedido parece un proyecto completo, no un cambio grande.
+Sugiero generar un roadmap primero con /project:roadmap para dividirlo en sesiones.
+¿Preferís hacer el roadmap o avanzar directo con el plan detallado?
+```
+
 ## Paso 1: Entender el cambio
 
 Preguntale al usuario:

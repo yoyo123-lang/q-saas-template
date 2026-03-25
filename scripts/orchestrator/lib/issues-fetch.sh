@@ -46,20 +46,49 @@ fetch_open_issues() {
     return 0
   }
 
-  # Parse JSON with node or python (no jq dependency — per project convention)
-  _run_json \
-    "const issues=JSON.parse(process.argv[1]);
-issues.forEach(i=>{
-  const b=Buffer.from(i.body||'').toString('base64');
-  console.log(i.number+'|'+i.title.replace(/\|/g,'_')+'|'+b);
-});" \
-    "
-import json, base64, sys
-issues = json.loads(sys.argv[1])
-for i in issues:
+  # Parse JSON with node or python via stdin (no jq, no _run_json — data piped)
+  _parse_issues_json "$raw"
+}
+
+# ── Parse issues JSON array from stdin/arg — portable (no jq, no _run_json) ──
+# Usage: _parse_issues_json <json_string>
+# Outputs: one line per issue: {number}|{title}|{body_base64}
+_parse_issues_json() {
+  local raw="$1"
+  [ -z "$raw" ] && return 0
+
+  if command -v node &>/dev/null; then
+    echo "$raw" | node -e "
+const raw = require('fs').readFileSync('/dev/stdin','utf8');
+const issues = JSON.parse(raw);
+issues.forEach(i => {
+  const b = Buffer.from(i.body || '').toString('base64').replace(/\n/g, '');
+  console.log(i.number + '|' + i.title.replace(/\|/g, '_') + '|' + b);
+});
+" 2>/dev/null || true
+  elif command -v python3 &>/dev/null; then
+    echo "$raw" | python3 -c "
+import sys, json, base64
+for i in json.load(sys.stdin):
     b = base64.b64encode((i.get('body') or '').encode()).decode()
-    print(str(i['number'])+'|'+i['title'].replace('|','_')+'|'+b)
-" "$raw" 2>/dev/null || true
+    print(str(i['number']) + '|' + i['title'].replace('|', '_') + '|' + b)
+" 2>/dev/null || true
+  elif command -v python &>/dev/null; then
+    echo "$raw" | python -c "
+import sys, json, base64
+for i in json.load(sys.stdin):
+    b = base64.b64encode((i.get('body') or '').encode()).decode()
+    print(str(i['number']) + '|' + i['title'].replace('|', '_') + '|' + b)
+" 2>/dev/null || true
+  else
+    ui_error "No se encontró node o python3 para parsear issues JSON"
+    return 1
+  fi
+}
+
+# ── Portable base64 decode — Linux (-d) and macOS (-D) ──
+_b64decode() {
+  echo "$1" | base64 -d 2>/dev/null || echo "$1" | base64 -D 2>/dev/null || echo ""
 }
 
 # ── Check if issue body contains the board directive marker ──
@@ -76,7 +105,12 @@ is_board_directive() {
 _parse_board_comment() {
   local body="$1"
   local key="$2"
-  echo "$body" | grep -oP "(?<=<!--[[:space:]]*board:${key}=)[^[:space:]>-]+" | head -1 | tr -d ' '
+  # Portable: grep -oP not available on macOS BSD grep → use sed
+  echo "$body" \
+    | grep "board:${key}=" \
+    | sed "s/.*board:${key}=\([^[:space:]>-]*\).*/\1/" \
+    | head -1 \
+    | tr -d ' '
 }
 
 # ── Parse a field from the markdown table ──
@@ -203,9 +237,9 @@ fetch_all_issues() {
     while IFS='|' read -r number title body_b64; do
       [ -z "$number" ] && continue
 
-      # Decode body
+      # Decode body (portable: Linux -d, macOS -D)
       local body
-      body=$(echo "$body_b64" | base64 -d 2>/dev/null || echo "")
+      body=$(_b64decode "$body_b64")
 
       # Skip non-board issues
       if ! is_board_directive "$body"; then

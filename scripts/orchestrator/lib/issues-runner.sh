@@ -31,8 +31,11 @@ ensure_repo_cloned() {
 
   if [ -d "${local_path}/.git" ]; then
     ui_info "Actualizando ${repo_name}..."
-    (cd "$local_path" && git fetch origin --prune 2>/dev/null && \
-      git checkout main 2>/dev/null || git checkout master 2>/dev/null || true) || true
+    # Reset to clean state on main before pulling — handles dirty repos from previous failures
+    (cd "$local_path" && git checkout main 2>/dev/null || git checkout master 2>/dev/null || true) || true
+    (cd "$local_path" && git reset --hard HEAD 2>/dev/null) || true
+    (cd "$local_path" && git clean -fd 2>/dev/null) || true
+    (cd "$local_path" && git fetch origin --prune 2>/dev/null) || true
     (cd "$local_path" && git pull origin HEAD --ff-only 2>/dev/null) || true
   else
     ui_info "Clonando ${repo}..."
@@ -143,8 +146,8 @@ create_draft_pr() {
   }
 
   _PR_URL="$pr_url"
-  # Extract PR number from URL
-  _PR_NUMBER=$(echo "$pr_url" | grep -oP '\d+$' || echo "")
+  # Extract PR number from URL (portable: no grep -oP)
+  _PR_NUMBER=$(echo "$pr_url" | sed 's|.*/||' | tr -cd '0-9')
   ui_ok "PR creado: ${pr_url}"
 }
 
@@ -195,6 +198,13 @@ handle_issue_failure() {
   local run_id="$9"
 
   ui_error "Issue #${issue_number} en ${repo}: falló (${error_type})"
+
+  # Reset repo to clean main state so the next issue starts fresh
+  if [ -n "$repo_path" ] && [ -d "${repo_path}/.git" ]; then
+    (cd "$repo_path" && git checkout main 2>/dev/null || git checkout master 2>/dev/null || true) || true
+    (cd "$repo_path" && git reset --hard HEAD 2>/dev/null) || true
+    (cd "$repo_path" && git clean -fd 2>/dev/null) || true
+  fi
 
   mark_issue_done "$repo" "$issue_number" "failed" "" "$log_file" "$attempts"
 
@@ -263,10 +273,11 @@ process_single_issue() {
     return 1
   }
 
-  # ── Decode instructions and requirements ──
+  # ── Decode instructions and requirements (portable: Linux -d / macOS -D) ──
   local instructions requirements
-  instructions=$(echo "$instr_b64" | base64 -d 2>/dev/null || echo "Ver issue #${number}")
-  requirements=$(echo "$req_b64" | base64 -d 2>/dev/null || echo "")
+  instructions=$(_b64decode "$instr_b64")
+  [ -z "$instructions" ] && instructions="Ver issue #${number} en GitHub."
+  requirements=$(_b64decode "$req_b64")
 
   # ── Build implementation prompt ──
   local impl_prompt
@@ -288,13 +299,14 @@ process_single_issue() {
   fi
 
   # ── CI check, fix and push via run_ci_check_and_fix() ──
-  # We repurpose session_num=1 and slug=directive_id for log naming
+  # Use "direct" strategy: we already checked out directive/{id} branch.
+  # Claude will push to the current branch (directive/{id}) directly.
+  # The PR is created separately by create_draft_pr() below.
   local directive_slug
   directive_slug=$(echo "$directive_id" | tr '[:upper:]' '[:lower:]' | tr -cd 'a-z0-9-')
 
-  # Override CI push behavior: always use PR strategy for issues mode
   local orig_branch_strategy="$ORCH_BRANCH_STRATEGY"
-  ORCH_BRANCH_STRATEGY="pr"
+  ORCH_BRANCH_STRATEGY="direct"
 
   ui_info "Ejecutando CI y push para issue #${number}..."
   local ci_exit=0

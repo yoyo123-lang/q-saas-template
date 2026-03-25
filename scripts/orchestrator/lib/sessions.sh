@@ -12,10 +12,14 @@ parse_roadmap() {
     return 1
   fi
 
+  # Convert path for node on Windows (Git Bash /c/ → C:/)
+  local native_roadmap
+  native_roadmap=$(_to_native_path "$roadmap_file")
+
   if [ "$_JSON_TOOL" = "node" ] || [ "$_JSON_TOOL" = "" ]; then
     node -e "
 const fs = require('fs');
-const content = fs.readFileSync('${roadmap_file}', 'utf8');
+const content = fs.readFileSync('${native_roadmap}', 'utf8');
 const pattern = /###\\s+Sesi[oó]n\\s+(\\d+)\\s*:\\s*(.+?)(?:\\n|$)/gi;
 let match;
 while ((match = pattern.exec(content)) !== null) {
@@ -38,7 +42,7 @@ while ((match = pattern.exec(content)) !== null) {
   else
     "$_JSON_TOOL" -c "
 import re
-with open('${roadmap_file}') as f:
+with open('${native_roadmap}') as f:
     content = f.read()
 pattern = r'###\s+Sesi[oó]n\s+(\d+)\s*:\s*(.+?)(?:\n|$)'
 for m in re.finditer(pattern, content, re.IGNORECASE):

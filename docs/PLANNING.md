@@ -34,6 +34,64 @@ Cuando el proyecto es grande (app completa, SaaS, sistema con múltiples módulo
 
 **Al cerrar la sesión:** actualizar `ROADMAP.md` marcando módulos/sesiones completadas.
 
+### Specs de sesión (capa intermedia)
+
+**Cuándo:** se generan durante `/project:roadmap` (Fase 1), una por cada sesión planificada.
+
+**Ubicación:** `sessions/S0N-nombre-descriptivo.md` en la raíz del proyecto.
+
+**Propósito:** cada spec es un documento autocontenido con suficiente contexto para que una sesión de Claude pueda arrancar sin explorar el codebase ni adivinar decisiones. Es el puente entre el roadmap (alto nivel) y el plan de implementación (tareas atómicas).
+
+**Relación con otros artefactos:**
+- `ROADMAP.md` referencia cada spec: `→ sessions/S01-auth-y-schema.md`
+- `/project:sesion` lee la spec como input principal (en vez de solo las 5 líneas del roadmap)
+- `IMPLEMENTATION_PLAN.md` se genera *a partir de* la spec, no desde cero
+
+**Formato de cada spec:**
+
+````markdown
+# Sesión N: [nombre descriptivo]
+
+> Spec generada por `/project:roadmap`. Consumida por `/project:sesion`.
+
+## Objetivo
+[Qué queda funcionando al terminar esta sesión — en 2-3 oraciones concretas, no vagas]
+
+## Contexto técnico
+[Qué ya existe en el proyecto que esta sesión necesita conocer: tablas, servicios, componentes, patrones. Ser específico con nombres de archivos/funciones si ya existen.]
+
+## Entidades y schema
+[Si esta sesión toca el modelo de datos: tablas, campos, tipos, relaciones. Formato de tabla o SQL según corresponda. Si no aplica, omitir sección.]
+
+## Contratos de API
+[Si esta sesión crea o consume endpoints: método, ruta, request body, response body, códigos de error. Si no aplica, omitir sección.]
+
+## Decisiones de diseño
+[Decisiones ya tomadas durante el roadmap que afectan esta sesión. Formato: "Se eligió X sobre Y porque Z". Esto evita que la sesión re-evalúe alternativas ya descartadas.]
+
+## Dependencias de sesiones anteriores
+[Qué específicamente necesita estar listo — no "Sesión 1 completada" sino "tabla `users` con campo `role`, endpoint `POST /api/auth/login` funcionando, componente `AuthProvider` montado"]
+
+## Archivos clave
+[Qué archivos leer antes de arrancar. Dividir en "existentes" (ya están) y "a crear" (esta sesión los genera).]
+
+## Criterios de aceptación
+[Lista concreta de qué tiene que pasar para considerar la sesión completa. Checkboxes. Deben ser verificables — "el usuario puede hacer X" o "el test Y pasa", no "el código es limpio".]
+
+## Fuera de alcance
+[Qué explícitamente NO hacer en esta sesión, aunque parezca relacionado.]
+
+## Notas para la implementación
+[Tips, gotchas, patrones a seguir, cosas que podrían salir mal. Opcional — solo si hay algo no obvio.]
+````
+
+**Reglas:**
+- Las secciones opcionales (Entidades, Contratos, Notas) se omiten si no aplican — no dejar secciones vacías
+- Los nombres de archivos y funciones deben ser concretos, no genéricos (`src/services/billing-service.ts`, no "el servicio de billing")
+- Los criterios de aceptación deben ser verificables por Claude (correr un test, hacer un request, verificar un render)
+- La spec NO incluye tareas atómicas — eso lo genera `IMPLEMENTATION_PLAN.md` a partir de la spec
+- Al cerrar una sesión, si se tomaron decisiones que afectan la spec de la sesión siguiente, se actualiza esa spec
+
 ### Flujo completo
 
 ```

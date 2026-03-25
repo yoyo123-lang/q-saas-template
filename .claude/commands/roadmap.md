@@ -104,6 +104,7 @@ Crear el archivo `ROADMAP.md` en la raíz del proyecto con este formato:
 ## Plan de sesiones
 
 ### Sesión 1: [nombre descriptivo]
+- **Spec**: → `sessions/S01-[nombre-kebab].md`
 - **Módulos**: M1 (completo)
 - **Objetivo**: [qué queda funcionando al terminar]
 - **Pre-requisitos**: ninguno
@@ -111,6 +112,7 @@ Crear el archivo `ROADMAP.md` en la raíz del proyecto con este formato:
 - **Estimación**: ~[N] min [modelo]
 
 ### Sesión 2: [nombre descriptivo]
+- **Spec**: → `sessions/S02-[nombre-kebab].md`
 - **Módulos**: M2 (backend)
 - **Objetivo**: [qué queda funcionando al terminar]
 - **Pre-requisitos**: Sesión 1 completada
@@ -141,6 +143,66 @@ S1: Auth ──→ S2: Modelos ──→ S4: Integración
 | Tiempo total estimado | ~[N] min |
 ```
 
+## Paso 5b: Generar specs de sesión
+
+Por cada sesión definida en el roadmap, crear un archivo en `sessions/` con la especificación detallada.
+
+### Ubicación y naming
+
+- Carpeta: `sessions/` en la raíz del proyecto
+- Formato: `S[NN]-[nombre-en-kebab-case].md`
+- Ejemplos: `sessions/S01-schema-y-auth.md`, `sessions/S02-modelos-backend.md`
+
+### Formato de cada spec
+
+```markdown
+# Sesión N: [nombre descriptivo]
+
+> Spec generada por `/project:roadmap`. Consumida por `/project:sesion`.
+
+## Objetivo
+[Qué queda funcionando al terminar — concreto, no vago. 2-3 oraciones.]
+
+## Contexto técnico
+[Qué ya existe o va a existir para cuando se ejecute esta sesión. Nombrar archivos, tablas, servicios concretos.]
+
+## Entidades y schema
+[Tablas, campos, tipos, relaciones. Solo si esta sesión toca modelo de datos. Omitir si no aplica.]
+
+## Contratos de API
+[Endpoints: método, ruta, request, response, errores. Solo si esta sesión crea/consume APIs. Omitir si no aplica.]
+
+## Decisiones de diseño
+[Decisiones tomadas durante el roadmap que afectan esta sesión. "Se eligió X sobre Y porque Z".]
+
+## Dependencias de sesiones anteriores
+[Qué específicamente necesita estar listo — nombres concretos de tablas, endpoints, componentes. No "Sesión 1 completada".]
+
+## Archivos clave
+- **Existentes**: [archivos que ya están y hay que leer]
+- **A crear**: [archivos que esta sesión debe generar]
+
+## Criterios de aceptación
+- [ ] [Criterio verificable 1]
+- [ ] [Criterio verificable 2]
+- [ ] [Criterio verificable N]
+
+## Fuera de alcance
+[Qué NO hacer en esta sesión.]
+
+## Notas para la implementación
+[Tips, gotchas, patrones. Opcional.]
+```
+
+### Reglas para generar specs
+
+1. **Secciones opcionales**: Entidades, Contratos y Notas se omiten si no aplican. No dejar secciones vacías.
+2. **Nombres concretos**: usar nombres reales de archivos/funciones, no genéricos. `src/services/billing-service.ts`, no "el servicio de billing".
+3. **Criterios verificables**: cada criterio debe poder comprobarse (correr un test, hacer un request, verificar un render).
+4. **Sin tareas atómicas**: la spec NO lista tareas — eso lo hace `IMPLEMENTATION_PLAN.md` a partir de la spec.
+5. **Detalle progresivo**: las primeras sesiones (1-2) pueden ser más detalladas porque hay más certeza. Las últimas pueden ser más generales, marcando con `[TBD]` lo que depende de decisiones futuras.
+6. **Todas las specs se generan en el paso de roadmap**, pero las últimas se refinan al cierre de sesiones anteriores.
+
 ## Paso 6: Validar con el usuario
 
 Presentar el roadmap completo y preguntar:
@@ -154,16 +216,24 @@ Esperá aprobación antes de guardar.
 
 ## Paso 7: Guardar y orientar
 
-1. Guardar `ROADMAP.md` en la raíz del proyecto
-2. Actualizar `SESSION_LOG.md` con la creación del roadmap
-3. Indicar al usuario cómo continuar:
+1. Crear la carpeta `sessions/` si no existe
+2. Guardar `ROADMAP.md` en la raíz del proyecto
+3. Guardar cada spec de sesión en `sessions/`
+4. Actualizar `SESSION_LOG.md` con la creación del roadmap
+5. Indicar al usuario cómo continuar:
 
 ```
 ✅ ROADMAP CREADO
 
+Archivos generados:
+- ROADMAP.md (índice con [N] sesiones)
+- sessions/S01-[nombre].md
+- sessions/S02-[nombre].md
+- [...]
+
 Próximo paso: arrancar la Sesión 1 con /project:sesion o /project:cambio-grande.
-Al inicio de cada sesión, voy a leer el ROADMAP.md para saber qué toca.
-Al cerrar cada sesión, voy a actualizar el estado de los módulos.
+Al inicio de cada sesión, voy a leer la spec correspondiente para tener contexto completo.
+Al cerrar cada sesión, voy a actualizar el estado y refinar la spec de la sesión siguiente.
 ```
 
 ## Actualización del roadmap entre sesiones
@@ -171,11 +241,13 @@ Al cerrar cada sesión, voy a actualizar el estado de los módulos.
 Al inicio de cada sesión (`/project:sesion`), si existe `ROADMAP.md`:
 - Leerlo y mostrar progreso: "Sesión N de M — módulos completados: X/Y"
 - Identificar qué sesión toca según el plan
+- Leer la spec de sesión correspondiente (`sessions/S0N-*.md`) como input principal
 
 Al cierre de cada sesión (`/project:cierre`), si existe `ROADMAP.md`:
 - Marcar módulos/sesiones completadas
 - Ajustar estimaciones de sesiones futuras si cambió algo
 - Documentar decisiones que afecten sesiones posteriores
+- **Refinar la spec de la sesión siguiente** si se tomaron decisiones que la afectan
 
 ---
 

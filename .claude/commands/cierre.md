@@ -65,6 +65,31 @@ Actualizar (o crear si no existe) `SESSION_LOG.md` con:
 - [ ] [tarea pendiente concreta]
 ```
 
+## Paso 4b: Refinar spec de la sesión siguiente (si hay roadmap)
+
+Si existe `ROADMAP.md` y la carpeta `sessions/`:
+
+1. Identificar cuál es la próxima sesión según el roadmap
+2. Leer su spec (`sessions/S0N-*.md`)
+3. Evaluar si algo de esta sesión afecta esa spec:
+   - ¿Se cambió el schema respecto a lo planificado?
+   - ¿Se tomó una decisión de diseño que cambia el approach?
+   - ¿Se creó/renombró un archivo que la spec referencia?
+   - ¿Quedó algo pendiente que la próxima sesión necesita absorber?
+4. Si hay cambios, actualizar la spec de la próxima sesión:
+   - Actualizar la sección "Dependencias de sesiones anteriores" con nombres reales
+   - Actualizar "Archivos clave > Existentes" con los archivos que efectivamente se crearon
+   - Agregar decisiones de diseño que se tomaron durante la implementación
+   - Ajustar criterios de aceptación si el alcance cambió
+   - Marcar con `[ACTUALIZADO en cierre de Sesión N]` los cambios para trazabilidad
+5. Si no hay cambios, no tocar la spec
+
+```
+SPEC SIGUIENTE: sessions/S0[N+1]-[nombre].md
+Estado: [✅ sin cambios / 🔄 actualizada — N campos modificados]
+Cambios: [lista breve de qué se actualizó, si aplica]
+```
+
 ## Paso 5: Commit y manejo de rama
 
 ### Si se está trabajando en un worktree:
@@ -102,3 +127,4 @@ Sugerile al usuario un nombre descriptivo para la sesión:
 - Si el build falla, no cerrar. Arreglar primero.
 - El SESSION_LOG es para la PRÓXIMA sesión. Escribilo pensando en alguien que arranca desde cero.
 - Ser breve. El cierre no debería tomar más de 2-3 minutos.
+- Si el proyecto tiene roadmap con specs (`sessions/`), siempre revisar si la spec siguiente necesita actualización. No cerrar sin verificar.

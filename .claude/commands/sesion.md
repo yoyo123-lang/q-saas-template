@@ -8,6 +8,7 @@
 
 Leé estos archivos si existen (en silencio, no los cites textualmente):
 - `ROADMAP.md` — si hay un roadmap de proyecto, identificar qué sesión toca
+- `sessions/S0N-*.md` — la spec detallada de la sesión que corresponde (ver más abajo)
 - `SESSION_LOG.md` — qué se hizo antes, qué quedó pendiente
 - `IMPLEMENTATION_PLAN.md` — si hay un plan en curso
 - `KNOWN_ISSUES.md` — errores conocidos que afecten lo que se va a hacer

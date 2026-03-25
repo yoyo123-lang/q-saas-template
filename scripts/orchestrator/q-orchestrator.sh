@@ -555,6 +555,15 @@ select_and_run_mode() {
   local project_path="$SELECTED_PATH"
   local slug="$SELECTED_SLUG"
   local model="$SELECTED_MODEL"
+
+  # ── Auto-pull: sync with remote before detecting capabilities ──
+  if [ -d "${project_path}/.git" ]; then
+    ui_info "Sincronizando con remoto..."
+    local current_branch
+    current_branch=$(cd "$project_path" && git symbolic-ref --short HEAD 2>/dev/null || echo "main")
+    (cd "$project_path" && git pull origin "$current_branch" --ff-only 2>/dev/null) || true
+  fi
+
   local caps
   caps=$(detect_capabilities "$project_path")
 

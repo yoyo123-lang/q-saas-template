@@ -15,6 +15,7 @@
 | Feature chico (1-2 etapas) | ABM completo de una entidad | 30-60 | 40-80 |
 | Feature mediano (3-4 etapas) | Sistema de notificaciones con real-time | 60-120 | 80-160 |
 | Feature grande (5+ etapas) | Auth completo con OAuth + roles + permisos | 120-240 | 160-320 |
+| **Roadmap de proyecto** | Meta-planificación de SaaS completo (solo texto, no código) | 15-30 | 20-40 |
 
 ### Factores multiplicadores
 

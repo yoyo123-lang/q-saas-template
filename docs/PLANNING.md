@@ -6,6 +6,80 @@
 
 **Nunca empezar a codear sin un plan aprobado.** El plan ES el prompt. Un buen plan produce buen código; un plan vago produce código que hay que rehacer.
 
+## Planificación en dos fases
+
+Cuando el proyecto es grande (app completa, SaaS, sistema con múltiples módulos), la planificación se divide en dos fases para evitar que una sesión se trunque tratando de planificar todo de una vez.
+
+### Fase 1 — Roadmap (meta-planificación)
+
+**Cuándo:** el plan tendría >5 etapas o >3 sesiones. Se detecta automáticamente (→ ver tabla en `CLAUDE.md` sección "Detección automática de escala").
+
+**Produce:** `ROADMAP.md` — un archivo de alto nivel que define:
+- Módulos del proyecto con dependencias entre sí
+- Orden de construcción (canónico para SaaS, personalizable)
+- Agrupación en sesiones con estimaciones
+- Qué queda fuera de alcance
+
+**Cómo:** usar `/project:roadmap`. Se hace en una sola sesión. No genera código.
+
+**Detalle progresivo:** el roadmap NO detalla tareas atómicas. Solo define módulos, sesiones y dependencias. El detalle fino se genera sesión por sesión en la Fase 2.
+
+### Fase 2 — Plan de sesión (detalle por sesión)
+
+**Cuándo:** al iniciar cada sesión de implementación, si existe un `ROADMAP.md`.
+
+**Produce:** `IMPLEMENTATION_PLAN.md` — el plan detallado con tareas atómicas SOLO para la sesión actual (máximo ~4 etapas, ~15 tareas).
+
+**Cómo:** al inicio de la sesión (`/project:sesion` o `/project:cambio-grande`), leer `ROADMAP.md`, identificar qué sesión toca, y detallar solo esas etapas.
+
+**Al cerrar la sesión:** actualizar `ROADMAP.md` marcando módulos/sesiones completadas.
+
+### Flujo completo
+
+```
+Usuario: "Necesito construir este SaaS para..."
+       ↓
+Fase 1: /project:roadmap → genera ROADMAP.md (1 sesión)
+       ↓
+Fase 2, Sesión 1: /project:sesion → lee ROADMAP.md → detalla sesión 1 → implementa
+       ↓
+Fase 2, Sesión 2: /project:sesion → lee ROADMAP.md → detalla sesión 2 → implementa
+       ↓
+... (N sesiones hasta completar)
+```
+
+### Orden canónico de construcción para SaaS
+
+Cuando no hay razones específicas para otro orden, seguir este:
+
+```
+1. Schema y migraciones de base de datos
+2. Tipos compartidos (interfaces, DTOs, enums)
+3. Auth y autorización (si no lo provee el template)
+4. Modelos y servicios de backend (lógica de negocio)
+5. Endpoints / API routes
+6. Layout y navegación base del frontend
+7. Páginas y componentes de frontend (por feature)
+8. Integración frontend ↔ backend (reemplazar mocks por APIs reales)
+9. Integraciones externas (pagos, email, notificaciones)
+10. Tests E2E
+11. Polish y QA final
+```
+
+Este orden garantiza coherencia entre frontend y backend: el schema existe antes que los servicios, los servicios antes que los endpoints, los endpoints antes que el frontend que los consume.
+
+### Handoff entre sesiones
+
+Al cerrar cada sesión, documentar en `SESSION_LOG.md` un bloque de handoff:
+
+```markdown
+#### Handoff para la próxima sesión
+- **Completado**: [qué módulos/sesiones del roadmap se terminaron]
+- **Próxima sesión**: [nombre de la sesión según ROADMAP.md]
+- **Decisiones que afectan lo que sigue**: [si se tomó alguna decisión técnica que cambie el plan]
+- **Archivos clave para retomar**: [qué leer primero]
+```
+
 ## Niveles de planificación
 
 ### Cambio simple (1 archivo, <50 líneas)

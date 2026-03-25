@@ -23,6 +23,8 @@
 : "${ORCH_MAX_TURNS_IMPLEMENT:=80}"
 # Max turns for review/fix/document steps (lighter work)
 : "${ORCH_MAX_TURNS_SUPPORT:=40}"
+# Max turns for each severity fix pass (CRITICAL, HIGH, MEDIUM)
+: "${ORCH_MAX_TURNS_FIX_PASS:=50}"
 # Max turns for build+push step
 : "${ORCH_MAX_TURNS_BUILD:=30}"
 # Max turns for CI fix attempts
@@ -134,6 +136,7 @@ generate_default_config() {
 # ── Turn limits ──
 # ORCH_MAX_TURNS_IMPLEMENT=80   # Main implementation step
 # ORCH_MAX_TURNS_SUPPORT=40     # Review, fix, document steps
+# ORCH_MAX_TURNS_FIX_PASS=50    # Per-severity fix pass (CRITICAL, HIGH, MEDIUM)
 # ORCH_MAX_TURNS_BUILD=30       # Build + push step
 # ORCH_MAX_TURNS_CI_FIX=50      # CI fix attempts
 
@@ -176,6 +179,7 @@ show_config() {
   ui_item "" "Modelo:           ${ORCH_MODEL}"
   ui_item "" "Turnos impl:      ${ORCH_MAX_TURNS_IMPLEMENT}"
   ui_item "" "Turnos soporte:   ${ORCH_MAX_TURNS_SUPPORT}"
+  ui_item "" "Turnos fix/sev:   ${ORCH_MAX_TURNS_FIX_PASS}"
   ui_item "" "Turnos build:     ${ORCH_MAX_TURNS_BUILD}"
   ui_item "" "Turnos CI fix:    ${ORCH_MAX_TURNS_CI_FIX}"
   ui_empty

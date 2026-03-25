@@ -289,32 +289,55 @@ run_session_cambio_grande() {
     fi
   fi
 
-  # ── Step: Fix findings ──
+  # ── Step: Fix findings (escalated by severity) ──
   if [ "$ORCH_SKIP_FIX" != "true" ]; then
     current_step=$((current_step + 1))
     echo -e "  ${BOLD}▸ Paso ${current_step}/${total_steps}: Corrección de hallazgos${RESET}"
     save_state "$slug" "$session_num" "fix" "running"
-    telemetry_step_start "fix" "$ORCH_MAX_TURNS_SUPPORT"
+    telemetry_step_start "fix" "$ORCH_MAX_TURNS_FIX_PASS"
 
-    step_exit=0
+    local fix_turns="${ORCH_MAX_TURNS_FIX_PASS}"
+    local severity_levels=("CRÍTICOS" "ALTOS" "MEDIOS")
+    local severity_all_ok=true
+
     if [ -n "$prompts_dir" ] && [ -f "${prompts_dir}/fix-findings.md" ]; then
-      run_claude_file "$project_path" "${prompts_dir}/fix-findings.md" "$model" "$ORCH_MAX_TURNS_SUPPORT" \
+      # Custom prompt file — run as single pass
+      step_exit=0
+      run_claude_file "$project_path" "${prompts_dir}/fix-findings.md" "$model" "$fix_turns" \
         "${log_dir}/${timestamp}-s${session_num}-fix.log" || step_exit=$?
+      [ $step_exit -ne 0 ] && severity_all_ok=false
     else
-      local prompt="Leé los informes de revisión en docs/reviews/ (si existen) y corregí todos los hallazgos CRÍTICOS y ALTOS. Commiteá cada corrección."
-      run_claude "$project_path" "$prompt" "$model" "$ORCH_MAX_TURNS_SUPPORT" \
-        "${log_dir}/${timestamp}-s${session_num}-fix.log" || step_exit=$?
+      # Escalated fix: one pass per severity level
+      for sev in "${severity_levels[@]}"; do
+        echo -e "    ${CYAN}↳ Corrigiendo hallazgos ${sev}${RESET}"
+        save_state "$slug" "$session_num" "fix-${sev,,}" "running"
+
+        local sev_lower="${sev,,}"
+        local fix_prompt="Leé los informes de revisión en docs/reviews/ (si existen). Corregí SOLO los hallazgos ${sev} que aún no estén resueltos. Commiteá cada corrección. Si no quedan hallazgos ${sev} pendientes, respondé 'No hay hallazgos ${sev} pendientes' y terminá."
+        step_exit=0
+        run_claude "$project_path" "$fix_prompt" "$model" "$fix_turns" \
+          "${log_dir}/${timestamp}-s${session_num}-fix-${sev_lower}.log" || step_exit=$?
+
+        if [ $step_exit -ne 0 ]; then
+          echo -e "    ${YELLOW}⚠ Fix de ${sev} no completó (max turns o error)${RESET}"
+          severity_all_ok=false
+          # Don't abort — continue with next severity and log debt
+        fi
+      done
     fi
 
-    if [ $step_exit -ne 0 ]; then
-      telemetry_step_end "fix" "$step_exit" "failed"
-      _handle_step_fail "corrección de hallazgos" || {
-        save_state "$slug" "$session_num" "fix" "failed"
-        telemetry_end_run "failed"
-        return 1
-      }
-    else
+    # Log unresolved findings as technical debt
+    echo -e "    ${CYAN}↳ Registrando deuda técnica (hallazgos pendientes)${RESET}"
+    local debt_prompt="Leé los informes de revisión en docs/reviews/. Compará con los cambios realizados (git log --oneline -20). Identificá hallazgos que NO fueron resueltos. Escribí un archivo docs/TECH_DEBT.md (o actualizalo si existe) con una sección para la Sesión ${session_num} listando los hallazgos pendientes por severidad. Si todos fueron resueltos, escribí 'Sin deuda técnica pendiente'. Incluí hallazgos BAJOS sin resolver también."
+    run_claude "$project_path" "$debt_prompt" "$model" 20 \
+      "${log_dir}/${timestamp}-s${session_num}-fix-debt.log" || true
+
+    if [ "$severity_all_ok" = true ]; then
       telemetry_step_end "fix" "0" "success"
+    else
+      telemetry_step_end "fix" "1" "partial"
+      # Don't fail the session — debt was logged
+      ui_warn "Algunos hallazgos no se corrigieron — registrados en docs/TECH_DEBT.md"
     fi
   fi
 
@@ -330,7 +353,7 @@ run_session_cambio_grande() {
       run_claude_file "$project_path" "${prompts_dir}/document.md" "$model" "$ORCH_MAX_TURNS_SUPPORT" \
         "${log_dir}/${timestamp}-s${session_num}-document.log" || step_exit=$?
     else
-      local prompt="Documentá lo que se hizo en esta sesión. Actualizá SESSION_LOG.md, ARCHITECTURE.md si aplica, y ROADMAP.md marcando la sesión ${session_num} como completada. IMPORTANTE: para marcar la sesión como completada en ROADMAP.md, cambiá el heading de '### Sesión ${session_num}: nombre' a '### Sesión ${session_num}: ~~nombre~~ ✅'. Usá exactamente ese formato (tachado con ~~ y emoji ✅)."
+      local prompt="Documentá lo que se hizo en esta sesión. Actualizá SESSION_LOG.md y ARCHITECTURE.md si aplica. NO modifiques ROADMAP.md (el progreso se trackea automáticamente)."
       run_claude "$project_path" "$prompt" "$model" "$ORCH_MAX_TURNS_SUPPORT" \
         "${log_dir}/${timestamp}-s${session_num}-document.log" || step_exit=$?
     fi

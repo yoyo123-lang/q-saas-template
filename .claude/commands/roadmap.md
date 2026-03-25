@@ -216,16 +216,24 @@ Esperá aprobación antes de guardar.
 
 ## Paso 7: Guardar y orientar
 
-1. Guardar `ROADMAP.md` en la raíz del proyecto
-2. Actualizar `SESSION_LOG.md` con la creación del roadmap
-3. Indicar al usuario cómo continuar:
+1. Crear la carpeta `sessions/` si no existe
+2. Guardar `ROADMAP.md` en la raíz del proyecto
+3. Guardar cada spec de sesión en `sessions/`
+4. Actualizar `SESSION_LOG.md` con la creación del roadmap
+5. Indicar al usuario cómo continuar:
 
 ```
 ✅ ROADMAP CREADO
 
+Archivos generados:
+- ROADMAP.md (índice con [N] sesiones)
+- sessions/S01-[nombre].md
+- sessions/S02-[nombre].md
+- [...]
+
 Próximo paso: arrancar la Sesión 1 con /project:sesion o /project:cambio-grande.
-Al inicio de cada sesión, voy a leer el ROADMAP.md para saber qué toca.
-Al cerrar cada sesión, voy a actualizar el estado de los módulos.
+Al inicio de cada sesión, voy a leer la spec correspondiente para tener contexto completo.
+Al cerrar cada sesión, voy a actualizar el estado y refinar la spec de la sesión siguiente.
 ```
 
 ## Actualización del roadmap entre sesiones
@@ -233,11 +241,13 @@ Al cerrar cada sesión, voy a actualizar el estado de los módulos.
 Al inicio de cada sesión (`/project:sesion`), si existe `ROADMAP.md`:
 - Leerlo y mostrar progreso: "Sesión N de M — módulos completados: X/Y"
 - Identificar qué sesión toca según el plan
+- Leer la spec de sesión correspondiente (`sessions/S0N-*.md`) como input principal
 
 Al cierre de cada sesión (`/project:cierre`), si existe `ROADMAP.md`:
 - Marcar módulos/sesiones completadas
 - Ajustar estimaciones de sesiones futuras si cambió algo
 - Documentar decisiones que afecten sesiones posteriores
+- **Refinar la spec de la sesión siguiente** si se tomaron decisiones que la afectan
 
 ---
 

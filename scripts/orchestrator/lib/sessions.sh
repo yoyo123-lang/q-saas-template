@@ -9,6 +9,7 @@ mkdir -p "$PROGRESS_DIR" 2>/dev/null
 # ── Parse ROADMAP.md to extract session LIST (names only) ──
 # Returns: "session_num|session_name" per line
 # Does NOT determine status — that comes from the progress file
+# Uses pure bash — no node/python needed, avoids encoding issues on Windows
 _list_roadmap_sessions() {
   local project_path="$1"
   local roadmap_file="${project_path}/ROADMAP.md"
@@ -17,33 +18,19 @@ _list_roadmap_sessions() {
     return 1
   fi
 
-  local native_roadmap
-  native_roadmap=$(_to_native_path "$roadmap_file")
-
-  if [ "$_JSON_TOOL" = "node" ] || [ "$_JSON_TOOL" = "" ]; then
-    node -e "
-const fs = require('fs');
-const content = fs.readFileSync('${native_roadmap}', 'utf8');
-const pattern = /###\\s+Sesi[oó]n\\s+(\\d+)\\s*:\\s*(.+?)(?:\\n|$)/gi;
-let match;
-while ((match = pattern.exec(content)) !== null) {
-  let num = parseInt(match[1]);
-  let name = match[2].trim().replace(/[~✅🔄]/g, '').trim();
-  console.log(num + '|' + name);
-}
-"
-  else
-    "$_JSON_TOOL" -c "
-import re
-with open('${native_roadmap}') as f:
-    content = f.read()
-pattern = r'###\s+Sesi[oó]n\s+(\d+)\s*:\s*(.+?)(?:\n|$)'
-for m in re.finditer(pattern, content, re.IGNORECASE):
-    num = int(m.group(1))
-    name = re.sub(r'[~✅🔄]', '', m.group(2)).strip()
-    print(f'{num}|{name}')
-"
-  fi
+  while IFS= read -r line || [ -n "$line" ]; do
+    # Match: ### Sesión N: name  (..? handles ó as 1 char in UTF-8 or 2 bytes in C locale)
+    if [[ "$line" =~ ^###[[:space:]]+[Ss]esi..?n[[:space:]]+([0-9]+)[[:space:]]*:[[:space:]]*(.+)$ ]]; then
+      local num="${BASH_REMATCH[1]}"
+      local name="${BASH_REMATCH[2]}"
+      # Strip trailing whitespace and markdown decorators
+      name="${name%%[[:space:]]}"
+      name="${name%%$'\r'}"
+      # Remove emoji markers if present
+      name="${name//\~/}"
+      echo "${num}|${name}"
+    fi
+  done < "$roadmap_file"
 }
 
 # ── Progress file path for a project ──

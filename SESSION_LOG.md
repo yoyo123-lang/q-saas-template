@@ -92,3 +92,61 @@ Resolver el problema de sesiones truncadas cuando se planifican proyectos grande
 - **Próxima sesión**: testear el flujo completo con un proyecto real (pedir "construí un SaaS para X" y verificar que se dispare el roadmap)
 - **Decisiones que afectan lo que sigue**: el `ROADMAP.md` se sobreescribe por proyecto, no se acumula
 - **Archivos clave para retomar**: `CLAUDE.md` (tabla de escala), `.claude/commands/roadmap.md` (skill)
+
+---
+
+## Sesión 4 — 2026-03-25 — Modo issues para q-orchestrator
+
+### Objetivo
+Implementar el modo `issues` en el q-orchestrator: procesamiento batch desatendido de GitHub Issues con label `board-directive`, priorizados CRITICAL→LOW, con implementación via Claude Code CLI, PR draft automático, y notificación al Board API.
+
+### Completado esta sesión
+- [x] `lib/issues-board-api.sh` — PATCH al Board API, builders de JSON payload con escaping correcto
+- [x] `lib/issues-fetch.sh` — fetch de GitHub Issues vía `gh` CLI, parse del body (directive_id, tipo, prioridad, instrucciones, requisitos)
+- [x] `lib/issues-queue.sh` — priorización CRITICAL→LOW, state por issue en JSON, filtro de completados
+- [x] `lib/issues-runner.sh` — loop de procesamiento, `process_single_issue()`, `run_issues_mode()` entry point
+- [x] `lib/issues-report.sh` — morning report en Markdown con completados/fallidos/pendientes
+- [x] `lib/config.sh` — variables `ORCH_ISSUES_*` agregadas con defaults y documentación
+- [x] `q-orchestrator.sh` — modo `issues` registrado, sourcing de libs, ayuda actualizada
+- [x] Revisión técnica completa (5 roles: Code Reviewer, QA Engineer, Security Auditor, DevOps/SRE, Consistency Reviewer)
+- [x] 2 hallazgos CRÍTICOS corregidos, 3 ALTOS corregidos, 4 MEDIOS corregidos, 1 BAJO corregido
+- [x] `docs/reviews/2026-03-25_issues-mode.md` — reporte de revisión
+- [x] `docs/decisions/ADR-0005-orchestrator-issues-mode.md` — ADR con decisión arquitectónica
+- [x] `scripts/orchestrator/ORCHESTRATOR_GUIDE.md` — sección "Modo issues" con todas las variables, formato de issues, pipeline, debugging
+- [x] `scripts/orchestrator/SETUP.md` — sección de activación, uso, requisitos y troubleshooting
+
+### Hallazgos críticos corregidos
+- `_run_json` no recibía datos JSON (arg 3 ignorado) → reemplazado por `_parse_issues_json()` vía stdin
+- `run_ci_check_and_fix` con `ORCH_BRANCH_STRATEGY="pr"` creaba branch equivocado → cambiado a `"direct"`
+
+### Hallazgos altos corregidos
+- `grep -oP` no portable en macOS → reemplazado con `grep | sed`
+- `base64 -d` falla en macOS → helper `_b64decode()` con fallback `-D`
+- Repo en estado sucio tras fallo → `git reset --hard + clean -fd` en `ensure_repo_cloned` y `handle_issue_failure`
+
+### Decisiones arquitectónicas
+- ADR-0005: Modo `issues` integrado en el orquestador (Option C) vs script separado o extensión del modo `continue`
+- Branch strategy: `ORCH_BRANCH_STRATEGY="direct"` en issues mode → PR creado por separado con `create_draft_pr()`
+- Sin dependencia de `jq` — JSON parseado con node/python vía stdin (convención del proyecto)
+- Board API graceful failure — issue se procesa aunque el Board no esté disponible
+
+### Archivos creados
+- `scripts/orchestrator/lib/issues-board-api.sh`
+- `scripts/orchestrator/lib/issues-fetch.sh`
+- `scripts/orchestrator/lib/issues-queue.sh`
+- `scripts/orchestrator/lib/issues-runner.sh`
+- `scripts/orchestrator/lib/issues-report.sh`
+- `docs/reviews/2026-03-25_issues-mode.md`
+- `docs/decisions/ADR-0005-orchestrator-issues-mode.md`
+
+### Archivos modificados
+- `scripts/orchestrator/lib/config.sh`
+- `scripts/orchestrator/q-orchestrator.sh`
+- `scripts/orchestrator/ORCHESTRATOR_GUIDE.md`
+- `scripts/orchestrator/SETUP.md`
+
+#### Handoff para la próxima sesión
+- **Completado**: modo issues implementado, revisado, y todos los hallazgos corregidos
+- **Pendiente**: test end-to-end con repo BU real (qautiva/qapitaliza) con `ORCH_ISSUES_REPOS` configurado
+- **Pendiente opcional**: modo `--dry-run` para mostrar cola sin procesar (recomendado en ADR y en revisión)
+- **Archivos clave para retomar**: `lib/issues-runner.sh` (entry point `run_issues_mode()`), `ORCHESTRATOR_GUIDE.md` (sección "Modo issues")

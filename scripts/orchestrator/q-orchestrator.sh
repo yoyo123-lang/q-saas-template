@@ -863,6 +863,228 @@ manage_config() {
   done
 }
 
+# ══════════════════════════════════════════════════════════════
+# SELF-IMPROVEMENT — Claude analyzes telemetry and improves
+# ══════════════════════════════════════════════════════════════
+
+run_self_improve() {
+  ui_header
+  ui_section "AUTO-MEJORA DEL ORQUESTADOR"
+  ui_empty
+  ui_item "" "Claude va a analizar la telemetría"
+  ui_item "" "y proponer mejoras al orquestador."
+  ui_empty
+  ui_section_end
+
+  # Check if there's telemetry data
+  local telemetry_base="${CONFIG_DIR}/telemetry"
+  if [ ! -d "$telemetry_base" ] || [ -z "$(find "$telemetry_base" -name '*.jsonl' 2>/dev/null | head -1)" ]; then
+    echo ""
+    ui_warn "No hay datos de telemetría todavía."
+    ui_info "Ejecutá al menos una sesión para generar datos."
+    echo ""
+    read -rp "  Presioná Enter para volver..."
+    return
+  fi
+
+  echo ""
+  ui_menu "¿QUÉ TIPO DE ANÁLISIS?" \
+    "Analizar y recomendar (solo lectura)" \
+    "Analizar y aplicar mejoras automáticamente" \
+    "Analizar un proyecto específico" \
+    "Volver"
+
+  local analysis_mode="$MENU_CHOICE"
+  [ "$analysis_mode" = "4" ] && return
+
+  # Collect all telemetry into a single temp file
+  local temp_telemetry
+  temp_telemetry=$(mktemp)
+  find "$telemetry_base" -name '*.jsonl' -type f | sort | while IFS= read -r f; do
+    echo "--- $(basename "$(dirname "$f")")/$(basename "$f") ---"
+    cat "$f"
+    echo ""
+  done > "$temp_telemetry"
+
+  # Collect current config
+  local temp_config
+  temp_config=$(mktemp)
+  {
+    echo "=== CURRENT CONFIG ==="
+    echo "ORCH_MODEL=$ORCH_MODEL"
+    echo "ORCH_MAX_TURNS_IMPLEMENT=$ORCH_MAX_TURNS_IMPLEMENT"
+    echo "ORCH_MAX_TURNS_SUPPORT=$ORCH_MAX_TURNS_SUPPORT"
+    echo "ORCH_MAX_TURNS_BUILD=$ORCH_MAX_TURNS_BUILD"
+    echo "ORCH_MAX_TURNS_CI_FIX=$ORCH_MAX_TURNS_CI_FIX"
+    echo "ORCH_CI_MAX_RETRIES=$ORCH_CI_MAX_RETRIES"
+    echo "ORCH_CI_TIMEOUT=$ORCH_CI_TIMEOUT"
+    echo "ORCH_SKIP_ROLES=$ORCH_SKIP_ROLES"
+    echo "ORCH_SKIP_FIX=$ORCH_SKIP_FIX"
+    echo "ORCH_SKIP_DOCS=$ORCH_SKIP_DOCS"
+    echo "ORCH_ON_STEP_FAIL=$ORCH_ON_STEP_FAIL"
+    echo "ORCH_ON_CI_EXHAUST=$ORCH_ON_CI_EXHAUST"
+    echo "ORCH_SKIP_PERMISSIONS=$ORCH_SKIP_PERMISSIONS"
+  } > "$temp_config"
+
+  local orchestrator_path="$SCRIPT_DIR"
+  local telemetry_content
+  telemetry_content=$(cat "$temp_telemetry")
+  local config_content
+  config_content=$(cat "$temp_config")
+
+  # Build the analysis prompt
+  local prompt
+  read -r -d '' prompt << 'PROMPTEOF' || true
+Sos un ingeniero de DevTools analizando datos de telemetría de un orquestador de sesiones de Claude Code.
+
+## Tu tarea
+
+Analizá los datos de telemetría y la configuración actual del orquestador. Basándote en los patrones que encontrés, generá recomendaciones concretas para mejorar el rendimiento, reducir fallos, y optimizar costos.
+
+## Datos de telemetría (JSONL events)
+
+```
+%%TELEMETRY%%
+```
+
+## Configuración actual
+
+```
+%%CONFIG%%
+```
+
+## Archivos del orquestador
+
+Leé los siguientes archivos para entender la implementación actual:
+- scripts/orchestrator/lib/config.sh (defaults y parámetros)
+- scripts/orchestrator/lib/runner.sh (ejecución de sesiones)
+- scripts/orchestrator/lib/telemetry.sh (sistema de telemetría)
+- scripts/orchestrator/q-orchestrator.sh (menú y flujos)
+
+## Qué analizar
+
+1. **Duración de pasos**: ¿Qué pasos tardan más? ¿Alguno excede consistentemente su max_turns?
+2. **Tasa de éxito**: ¿Qué pasos fallan más? ¿Hay un patrón de fallos recurrentes?
+3. **CI retries**: ¿Son efectivos? ¿Cuántos intentos se necesitan en promedio? ¿Deberían ser más o menos?
+4. **Config tuning**: ¿Los max_turns actuales son adecuados o necesitan ajuste?
+5. **Cuellos de botella**: ¿Dónde se pierde más tiempo?
+6. **Prompts**: ¿Los prompts inline están siendo efectivos? ¿Se podrían mejorar?
+7. **Flujo**: ¿El orden de pasos es óptimo? ¿Falta algún paso? ¿Sobra alguno?
+
+## Output esperado
+
+%%OUTPUT_INSTRUCTIONS%%
+PROMPTEOF
+
+  # Replace placeholders
+  prompt="${prompt//%%TELEMETRY%%/$telemetry_content}"
+  prompt="${prompt//%%CONFIG%%/$config_content}"
+
+  case "$analysis_mode" in
+    1)
+      # Read-only analysis
+      prompt="${prompt//%%OUTPUT_INSTRUCTIONS%%/Generá un reporte en markdown con:
+1. **Resumen ejecutivo** (3-5 bullets)
+2. **Hallazgos detallados** por categoría
+3. **Recomendaciones** con valores concretos (ej: \"cambiar ORCH_MAX_TURNS_IMPLEMENT de 80 a 120\")
+4. **Priorización**: qué cambiar primero para mayor impacto
+
+NO modifiques ningún archivo. Solo analizá y reportá.
+Guardá el reporte en docs/orchestrator-analysis.md (creá el archivo).}"
+
+      echo ""
+      ui_info "Ejecutando análisis (solo lectura)..."
+      echo ""
+      run_claude "$orchestrator_path" "$prompt" "$ORCH_MODEL" "$ORCH_MAX_TURNS_SUPPORT"
+      ;;
+    2)
+      # Auto-apply improvements
+      prompt="${prompt//%%OUTPUT_INSTRUCTIONS%%/Basándote en tu análisis:
+
+1. **Generá un reporte** en docs/orchestrator-analysis.md con hallazgos y cambios realizados
+2. **Modificá lib/config.sh** — ajustá los defaults basándote en los datos reales
+3. **Modificá lib/runner.sh** — mejorá prompts, flujo, o lógica si encontrás problemas
+4. **Modificá lib/telemetry.sh** — agregá métricas faltantes si las necesitás
+5. **NO rompas nada** — corré bash -n en cada archivo que modifiques para verificar sintaxis
+
+Reglas:
+- Solo cambiá valores default si los datos lo justifican claramente
+- Si mejorás un prompt, explicá por qué en el reporte
+- Commiteá cada cambio con un mensaje descriptivo
+- Si no hay suficientes datos para decidir, dejá el valor actual y anotalo como \"insuficientes datos\"}"
+
+      echo ""
+      ui_warn "Claude va a analizar la telemetría Y modificar el orquestador."
+      if ui_confirm "¿Continuar?"; then
+        echo ""
+        ui_info "Ejecutando análisis y aplicando mejoras..."
+        echo ""
+        run_claude "$orchestrator_path" "$prompt" "$ORCH_MODEL" "$ORCH_MAX_TURNS_IMPLEMENT"
+      fi
+      ;;
+    3)
+      # Single project analysis
+      local options=()
+      local slugs=()
+      while IFS='|' read -r idx slug path repo branch; do
+        options+=("${slug}")
+        slugs+=("${slug}")
+      done < <(list_projects)
+
+      if [ ${#options[@]} -eq 0 ]; then
+        ui_warn "No hay proyectos registrados."
+        read -rp "  Presioná Enter para volver..."
+        rm -f "$temp_telemetry" "$temp_config"
+        return
+      fi
+
+      ui_menu "SELECCIONAR PROYECTO" "${options[@]}"
+      local selected_slug="${slugs[$((MENU_CHOICE - 1))]}"
+
+      # Filter telemetry for this project only
+      local project_telemetry_dir="${telemetry_base}/${selected_slug}"
+      if [ ! -d "$project_telemetry_dir" ] || [ -z "$(ls -A "$project_telemetry_dir" 2>/dev/null)" ]; then
+        ui_warn "No hay telemetría para ${selected_slug}."
+        read -rp "  Presioná Enter para volver..."
+        rm -f "$temp_telemetry" "$temp_config"
+        return
+      fi
+
+      # Rebuild telemetry with only this project
+      : > "$temp_telemetry"
+      find "$project_telemetry_dir" -name '*.jsonl' -type f | sort | while IFS= read -r f; do
+        echo "--- $(basename "$f") ---"
+        cat "$f"
+        echo ""
+      done > "$temp_telemetry"
+
+      telemetry_content=$(cat "$temp_telemetry")
+      prompt="${prompt//%%TELEMETRY%%/$telemetry_content}"
+
+      prompt="${prompt//%%OUTPUT_INSTRUCTIONS%%/Generá un reporte enfocado en el proyecto ${selected_slug}:
+1. **Resumen ejecutivo**
+2. **Hallazgos específicos** de este proyecto
+3. **Recomendaciones de config** — podés sugerir un archivo .q-orchestrator.sh específico para este proyecto
+4. **Sugerencias de prompts** — si los prompts de sesión/soporte necesitan ajustes
+
+Guardá el reporte en docs/orchestrator-analysis-${selected_slug}.md.
+NO modifiques archivos del orquestador.}"
+
+      echo ""
+      ui_info "Analizando telemetría de ${selected_slug}..."
+      echo ""
+      run_claude "$orchestrator_path" "$prompt" "$ORCH_MODEL" "$ORCH_MAX_TURNS_SUPPORT"
+      ;;
+  esac
+
+  # Cleanup
+  rm -f "$temp_telemetry" "$temp_config"
+
+  echo ""
+  ui_ok "Análisis completado."
+  read -rp "  Presioná Enter para volver..."
+}
+
 main_menu() {
   while true; do
     ui_header
@@ -892,6 +1114,7 @@ main_menu() {
       "Configuración" \
       "Diagnóstico del entorno" \
       "Logs y telemetría" \
+      "Auto-mejora (Claude analiza y mejora el orquestador)" \
       "Salir"
 
     case "$MENU_CHOICE" in
@@ -905,7 +1128,8 @@ main_menu() {
       3) manage_config ;;
       4) run_diagnostic ;;
       5) manage_logs ;;
-      6) echo ""; echo "  Hasta luego!"; echo ""; exit 0 ;;
+      6) run_self_improve ;;
+      7) echo ""; echo "  Hasta luego!"; echo ""; exit 0 ;;
     esac
   done
 }

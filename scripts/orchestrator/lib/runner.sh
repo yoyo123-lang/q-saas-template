@@ -269,7 +269,8 @@ Leé ROADMAP.md, buscá la Sesión ${session_num}: ${session_name}, y ejecutá T
 
 Reglas:
 - Implementá directamente, commit por tarea atómica
-- Si hay un IMPLEMENTATION_PLAN.md, seguilo. Si no, implementá las etapas del ROADMAP
+- NO crees ni modifiques IMPLEMENTATION_PLAN.md — el plan ya está en ROADMAP.md
+- El ROADMAP.md tiene las etapas detalladas de cada sesión, seguí esas etapas
 - TDD obligatorio para lógica de negocio
 - NO te detengas a preguntar o pedir aprobación — tomá las decisiones técnicas razonables y seguí
 - Si encontrás ambiguedad, elegí la opción más simple y documentá la decisión en un comentario"

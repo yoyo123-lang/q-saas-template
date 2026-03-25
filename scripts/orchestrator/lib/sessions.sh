@@ -30,10 +30,12 @@ while ((match = pattern.exec(content)) !== null) {
   const rest = content.slice(start);
   const nextMatch = rest.match(/###\\s+Sesi[oó]n\\s+\\d+/i);
   const section = nextMatch ? rest.slice(0, nextMatch.index) : rest;
-  const head = section.slice(0, 200).toLowerCase();
-  if (name.includes('~~') || name.includes('✅') || head.includes('[x]')) {
+  const body = section.toLowerCase();
+  // Completed: only by heading markers (~~, ✅) or explicit status line
+  const hasStatusCompleted = /^\\s*[-*]\\s*\\*\\*estado\\*\\*\\s*:\\s*completad/m.test(body);
+  if (name.includes('~~') || name.includes('✅') || hasStatusCompleted) {
     status = 'completed'; name = name.replace(/[~✅]/g, '').trim();
-  } else if (name.includes('🔄') || head.includes('en progreso')) {
+  } else if (name.includes('🔄') || /^\\s*[-*]\\s*\\*\\*estado\\*\\*\\s*:\\s*en progreso/m.test(body)) {
     status = 'in-progress'; name = name.replace(/🔄/g, '').trim();
   }
   console.log(num + '|' + name + '|' + status);
@@ -52,10 +54,11 @@ for m in re.finditer(pattern, content, re.IGNORECASE):
     nx = re.search(r'###\s+Sesi[oó]n\s+\d+', content[start:], re.IGNORECASE)
     end = start + nx.start() if nx else len(content)
     section = content[start:end]
-    head = section[:200].lower()
-    if '~~' in name or '✅' in name or '[x]' in head:
+    body = section.lower()
+    has_status_completed = bool(re.search(r'^\s*[-*]\s*\*\*estado\*\*\s*:\s*completad', body, re.MULTILINE))
+    if '~~' in name or '✅' in name or has_status_completed:
         status = 'completed'; name = re.sub(r'[~✅]', '', name).strip()
-    elif '🔄' in name or 'en progreso' in head:
+    elif '🔄' in name or bool(re.search(r'^\s*[-*]\s*\*\*estado\*\*\s*:\s*en progreso', body, re.MULTILINE)):
         status = 'in-progress'; name = re.sub(r'🔄', '', name).strip()
     else:
         status = 'pending'

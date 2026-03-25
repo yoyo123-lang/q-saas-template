@@ -317,7 +317,7 @@ run_session_cambio_grande() {
       run_claude_file "$project_path" "${prompts_dir}/document.md" "$model" "$ORCH_MAX_TURNS_SUPPORT" \
         "${log_dir}/${timestamp}-s${session_num}-document.log" || step_exit=$?
     else
-      local prompt="Documentá lo que se hizo en esta sesión. Actualizá SESSION_LOG.md, ARCHITECTURE.md si aplica, y ROADMAP.md marcando la sesión ${session_num} como completada."
+      local prompt="Documentá lo que se hizo en esta sesión. Actualizá SESSION_LOG.md, ARCHITECTURE.md si aplica, y ROADMAP.md marcando la sesión ${session_num} como completada. IMPORTANTE: para marcar la sesión como completada en ROADMAP.md, cambiá el heading de '### Sesión ${session_num}: nombre' a '### Sesión ${session_num}: ~~nombre~~ ✅'. Usá exactamente ese formato (tachado con ~~ y emoji ✅)."
       run_claude "$project_path" "$prompt" "$model" "$ORCH_MAX_TURNS_SUPPORT" \
         "${log_dir}/${timestamp}-s${session_num}-document.log" || step_exit=$?
     fi

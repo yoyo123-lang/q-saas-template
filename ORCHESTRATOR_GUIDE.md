@@ -329,3 +329,18 @@ echo "Listo!"
 ```
 
 Eso es lo mínimo funcional. Después podés ir agregando complejidad según necesites.
+
+## q-orchestrator (alternativa agnóstica)
+
+El `iniciar.bat` original está hardcodeado a un proyecto y a 11 sesiones. Para un orquestador que funcione con **cualquier proyecto** y en **cualquier plataforma**, ver:
+
+- **Instalación y uso:** `scripts/orchestrator/SETUP.md`
+- **Conectar un repo existente:** `scripts/orchestrator/ORCHESTRATOR_CONNECT.md`
+
+Ventajas sobre `iniciar.bat`:
+- Cross-platform (Linux, macOS, WSL, Git Bash en Windows)
+- Multi-proyecto — registrá N repos y elegí en cuál trabajar
+- Detección automática de sesiones desde `ROADMAP.md`
+- Selector de modelo (Sonnet / Opus / Haiku)
+- Selector de modo de trabajo (roadmap, cambio-grande, cambio, sesión libre)
+- Wrapper scripts finos para cada proyecto (se instala una vez, se usa desde cualquier repo)

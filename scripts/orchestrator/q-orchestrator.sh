@@ -481,12 +481,14 @@ SELECTED_PATH=""
 SELECTED_REPO=""
 SELECTED_BRANCH=""
 SELECTED_BRANCH_STRATEGY=""
+SELECTED_IDX=""
 
 select_project() {
   if [ -n "$ARG_PROJECT" ]; then
     # Find by slug from CLI arg
     while IFS='|' read -r idx slug path repo branch branch_strategy; do
       if [ "$slug" = "$ARG_PROJECT" ]; then
+        SELECTED_IDX=$((idx - 1))
         SELECTED_SLUG="$slug"
         SELECTED_PATH="$path"
         SELECTED_REPO="$repo"
@@ -537,6 +539,7 @@ select_project() {
   ui_menu "SELECCIONAR PROYECTO" "${options[@]}"
   local idx=$((MENU_CHOICE - 1))
 
+  SELECTED_IDX="$idx"
   SELECTED_SLUG="${slugs[$idx]}"
   SELECTED_PATH="${paths[$idx]}"
   SELECTED_REPO="${repos[$idx]}"
@@ -592,6 +595,34 @@ select_and_run_mode() {
   # ── Override branch strategy from project registration ──
   if [ -n "$SELECTED_BRANCH_STRATEGY" ]; then
     ORCH_BRANCH_STRATEGY="$SELECTED_BRANCH_STRATEGY"
+  fi
+
+  # ── Show current strategy and offer to change ──
+  local strategy_display="direct (push a ${SELECTED_BRANCH:-main})"
+  [ "$ORCH_BRANCH_STRATEGY" = "pr" ] && strategy_display="pr (branch por sesión + Pull Request)"
+  echo ""
+  ui_info "Estrategia de branch: ${strategy_display}"
+
+  if [ -z "$ARG_MODE" ]; then
+    # Only offer to change in interactive mode
+    read -rp "  ¿Cambiar? [s/N]: " change_strategy
+    if [[ "$change_strategy" =~ ^[sS]$ ]]; then
+      echo "    [1] direct — push directo a ${SELECTED_BRANCH:-main}"
+      echo "    [2] pr     — branch por sesión + Pull Request"
+      read -r new_strategy_choice
+      if [ "$new_strategy_choice" = "1" ]; then
+        ORCH_BRANCH_STRATEGY="direct"
+        SELECTED_BRANCH_STRATEGY="direct"
+      elif [ "$new_strategy_choice" = "2" ]; then
+        ORCH_BRANCH_STRATEGY="pr"
+        SELECTED_BRANCH_STRATEGY="pr"
+      fi
+      # Persist to projects.json
+      if [ -n "$SELECTED_IDX" ]; then
+        update_project_field "$SELECTED_IDX" "branch_strategy" "$ORCH_BRANCH_STRATEGY"
+        ui_ok "Estrategia actualizada a '${ORCH_BRANCH_STRATEGY}' y guardada."
+      fi
+    fi
   fi
 
   # ── Override model from config if user didn't pick via CLI ──

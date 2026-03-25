@@ -373,11 +373,13 @@ register_project() {
 
   echo ""
   ui_prompt "Estrategia de branches:"
-  echo "    [1] direct — push directo a ${branch:-main} (proyectos sin producción)"
-  echo "    [2] pr     — branch por sesión + Pull Request (proyectos en producción)"
+  echo "    [1] direct         — push directo a ${branch:-main} (proyectos sin producción)"
+  echo "    [2] pr             — branch por sesión + Pull Request (proyectos en producción)"
+  echo "    [3] roadmap-branch — un branch por roadmap, todas las sesiones ahí"
   read -r strategy_choice
   local branch_strategy="direct"
   [ "$strategy_choice" = "2" ] && branch_strategy="pr"
+  [ "$strategy_choice" = "3" ] && branch_strategy="roadmap-branch"
 
   local result
   result=$(add_project "$slug" "$path" "$repo" "$branch" "$branch_strategy")
@@ -522,6 +524,7 @@ select_project() {
   while IFS='|' read -r idx slug path repo branch branch_strategy; do
     local strategy_tag=""
     [ "$branch_strategy" = "pr" ] && strategy_tag=" [PR]"
+    [ "$branch_strategy" = "roadmap-branch" ] && strategy_tag=" [ROADMAP]"
     local label="${slug}${strategy_tag} — ${path}"
     if [ -f "${path}/ROADMAP.md" ]; then
       local pending
@@ -600,6 +603,7 @@ select_and_run_mode() {
   # ── Show current strategy and offer to change ──
   local strategy_display="direct (push a ${SELECTED_BRANCH:-main})"
   [ "$ORCH_BRANCH_STRATEGY" = "pr" ] && strategy_display="pr (branch por sesión + Pull Request)"
+  [ "$ORCH_BRANCH_STRATEGY" = "roadmap-branch" ] && strategy_display="roadmap-branch (un branch para todo el roadmap)"
   echo ""
   ui_info "Estrategia de branch: ${strategy_display}"
 
@@ -607,8 +611,9 @@ select_and_run_mode() {
     # Only offer to change in interactive mode
     read -rp "  ¿Cambiar? [s/N]: " change_strategy
     if [[ "$change_strategy" =~ ^[sS]$ ]]; then
-      echo "    [1] direct — push directo a ${SELECTED_BRANCH:-main}"
-      echo "    [2] pr     — branch por sesión + Pull Request"
+      echo "    [1] direct         — push directo a ${SELECTED_BRANCH:-main}"
+      echo "    [2] pr             — branch por sesión + Pull Request"
+      echo "    [3] roadmap-branch — un branch para todo el roadmap"
       read -r new_strategy_choice
       if [ "$new_strategy_choice" = "1" ]; then
         ORCH_BRANCH_STRATEGY="direct"
@@ -616,6 +621,9 @@ select_and_run_mode() {
       elif [ "$new_strategy_choice" = "2" ]; then
         ORCH_BRANCH_STRATEGY="pr"
         SELECTED_BRANCH_STRATEGY="pr"
+      elif [ "$new_strategy_choice" = "3" ]; then
+        ORCH_BRANCH_STRATEGY="roadmap-branch"
+        SELECTED_BRANCH_STRATEGY="roadmap-branch"
       fi
       # Persist to projects.json
       if [ -n "$SELECTED_IDX" ]; then
@@ -740,7 +748,20 @@ run_mode_continue() {
   # Branch strategy info
   local strategy_label=""
   if [ "$ORCH_BRANCH_STRATEGY" = "pr" ]; then
-    strategy_label=" [branch + PR]"
+    strategy_label=" [branch + PR por sesión]"
+  elif [ "$ORCH_BRANCH_STRATEGY" = "roadmap-branch" ]; then
+    strategy_label=" [branch roadmap/${slug}]"
+  fi
+
+  # If roadmap-branch strategy, ensure we're on the right branch
+  if [ "$ORCH_BRANCH_STRATEGY" = "roadmap-branch" ]; then
+    local roadmap_branch="roadmap/${slug}"
+    local current_branch
+    current_branch=$(cd "$project_path" && git symbolic-ref --short HEAD 2>/dev/null || echo "")
+    if [ "$current_branch" != "$roadmap_branch" ]; then
+      ui_info "Switcheando a branch ${roadmap_branch}..."
+      (cd "$project_path" && git checkout "$roadmap_branch" 2>/dev/null || git checkout -b "$roadmap_branch") || true
+    fi
   fi
 
   ui_menu "¿QUÉ HACER?${strategy_label}" \

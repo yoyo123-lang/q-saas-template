@@ -113,10 +113,14 @@ run_diagnostic() {
     ui_item "[!!]" "Node.js no encontrado"
   fi
 
-  if command -v python3 &>/dev/null; then
-    ui_item "[OK]" "$(python3 --version)"
+  # Test python3 with actual execution to avoid Windows Store alias
+  local py_version
+  if py_version=$(python3 --version 2>/dev/null) && [[ "$py_version" == *"Python"* ]]; then
+    ui_item "[OK]" "$py_version"
+  elif py_version=$(python --version 2>/dev/null) && [[ "$py_version" == *"Python"* ]]; then
+    ui_item "[OK]" "$py_version"
   else
-    ui_item "[!!]" "Python3 no encontrado"
+    ui_item "[--]" "Python no instalado (opcional si tenés Node)"
   fi
 
   local count

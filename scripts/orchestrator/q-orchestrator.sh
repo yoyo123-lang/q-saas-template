@@ -66,8 +66,19 @@ check_deps() {
     ok=false
   fi
 
-  if ! command -v python3 &>/dev/null && ! command -v node &>/dev/null; then
-    ui_error "Se necesita python3 o node para gestionar estado."
+  # On Windows, "python3" may be a Store alias that opens the Store instead of running.
+  # Check node first (more likely on Windows), then python3 with a real execution test.
+  local has_json_tool=false
+  if command -v node &>/dev/null; then
+    has_json_tool=true
+  elif command -v python3 &>/dev/null && python3 -c "print('ok')" &>/dev/null; then
+    has_json_tool=true
+  elif command -v python &>/dev/null && python -c "print('ok')" &>/dev/null; then
+    has_json_tool=true
+  fi
+
+  if [ "$has_json_tool" = false ]; then
+    ui_error "Se necesita node o python3 para gestionar estado."
     ok=false
   fi
 

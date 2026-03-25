@@ -155,19 +155,193 @@ run_diagnostic() {
 manage_projects() {
   while true; do
     ui_header
-    ui_menu "GESTIÓN DE PROYECTOS" \
-      "Registrar proyecto nuevo" \
-      "Ver proyectos registrados" \
-      "Eliminar proyecto" \
-      "Volver al menú principal"
 
-    case "$MENU_CHOICE" in
-      1) register_project ;;
-      2) show_projects ;;
-      3) remove_project_menu ;;
-      4) return ;;
-    esac
+    # Show GitHub option only if gh CLI is available
+    if command -v gh &>/dev/null; then
+      ui_menu "GESTIÓN DE PROYECTOS" \
+        "Clonar desde GitHub" \
+        "Registrar proyecto local" \
+        "Ver proyectos registrados" \
+        "Eliminar proyecto" \
+        "Volver al menú principal"
+
+      case "$MENU_CHOICE" in
+        1) clone_from_github ;;
+        2) register_project ;;
+        3) show_projects ;;
+        4) remove_project_menu ;;
+        5) return ;;
+      esac
+    else
+      ui_menu "GESTIÓN DE PROYECTOS" \
+        "Registrar proyecto local" \
+        "Ver proyectos registrados" \
+        "Eliminar proyecto" \
+        "Instalar GitHub CLI (instrucciones)" \
+        "Volver al menú principal"
+
+      case "$MENU_CHOICE" in
+        1) register_project ;;
+        2) show_projects ;;
+        3) remove_project_menu ;;
+        4) show_gh_install_help ;;
+        5) return ;;
+      esac
+    fi
   done
+}
+
+# ── Clone from GitHub ──
+clone_from_github() {
+  echo ""
+
+  # Check gh auth
+  if ! gh auth status &>/dev/null 2>&1; then
+    ui_error "No estás logueado en GitHub CLI."
+    ui_info "Ejecutá: gh auth login"
+    echo ""
+    read -rp "  Presioná Enter para volver..."
+    return
+  fi
+
+  ui_info "Buscando tus repositorios en GitHub..."
+  echo ""
+
+  # Fetch repos (owned by user, sorted by last push)
+  local repos_raw
+  repos_raw=$(gh repo list --limit 30 --json nameWithOwner,description,updatedAt --jq '.[] | .nameWithOwner + "|" + (.description // "sin descripción")' 2>/dev/null)
+
+  if [ -z "$repos_raw" ]; then
+    ui_error "No se pudieron obtener los repositorios."
+    echo ""
+    read -rp "  Presioná Enter para volver..."
+    return
+  fi
+
+  # Build menu
+  local repo_names=()
+  local repo_options=()
+  local i=1
+
+  while IFS='|' read -r name desc; do
+    repo_names+=("$name")
+    # Truncate description for display
+    local short_desc="${desc:0:40}"
+    repo_options+=("${name} — ${short_desc}")
+    i=$((i + 1))
+  done <<< "$repos_raw"
+
+  if [ ${#repo_names[@]} -eq 0 ]; then
+    ui_warn "No se encontraron repositorios."
+    echo ""
+    read -rp "  Presioná Enter para volver..."
+    return
+  fi
+
+  # Add search option at the end
+  repo_options+=("Buscar otro repo por nombre")
+
+  ui_menu "SELECCIONAR REPOSITORIO" "${repo_options[@]}"
+
+  local selected_repo=""
+
+  if [ "$MENU_CHOICE" -le "${#repo_names[@]}" ]; then
+    selected_repo="${repo_names[$((MENU_CHOICE - 1))]}"
+  else
+    # Search by name
+    echo ""
+    ui_prompt "Nombre del repo (usuario/repo):"
+    read -r selected_repo
+    if [ -z "$selected_repo" ]; then return; fi
+
+    # Verify it exists
+    if ! gh repo view "$selected_repo" &>/dev/null 2>&1; then
+      ui_error "Repo '${selected_repo}' no encontrado."
+      echo ""
+      read -rp "  Presioná Enter para volver..."
+      return
+    fi
+  fi
+
+  echo ""
+  ui_info "Repo seleccionado: ${selected_repo}"
+
+  # Ask where to clone
+  local default_dir="$HOME/projects"
+  ui_prompt "Carpeta destino (Enter para ${default_dir}):"
+  read -r clone_dir
+  [ -z "$clone_dir" ] && clone_dir="$default_dir"
+  clone_dir="${clone_dir/#\~/$HOME}"
+
+  # Create dir if needed
+  mkdir -p "$clone_dir"
+
+  # Extract repo name for the folder
+  local repo_short="${selected_repo##*/}"
+  local clone_path="${clone_dir}/${repo_short}"
+
+  if [ -d "$clone_path" ]; then
+    ui_warn "La carpeta ya existe: ${clone_path}"
+    if ui_confirm "¿Usar la carpeta existente?"; then
+      # Just register, don't clone
+      :
+    else
+      echo ""
+      read -rp "  Presioná Enter para volver..."
+      return
+    fi
+  else
+    echo ""
+    ui_info "Clonando ${selected_repo}..."
+    if ! gh repo clone "$selected_repo" "$clone_path" 2>&1; then
+      ui_error "Error al clonar."
+      echo ""
+      read -rp "  Presioná Enter para volver..."
+      return
+    fi
+    ui_ok "Clonado en: ${clone_path}"
+  fi
+
+  # Auto-register
+  local slug="$repo_short"
+  echo ""
+  ui_prompt "Slug del proyecto (Enter para '${slug}'):"
+  read -r custom_slug
+  [ -n "$custom_slug" ] && slug="$custom_slug"
+
+  # Detect default branch
+  local branch
+  branch=$(cd "$clone_path" && git symbolic-ref --short HEAD 2>/dev/null || echo "main")
+
+  local result
+  result=$(add_project "$slug" "$clone_path" "$selected_repo" "$branch")
+
+  if [ "$result" = "OK" ]; then
+    ui_ok "Proyecto '${slug}' registrado y listo para usar."
+  elif [ "$result" = "DUPLICATE" ]; then
+    ui_warn "Ya existe un proyecto con slug '${slug}'."
+  fi
+
+  echo ""
+  read -rp "  Presioná Enter para continuar..."
+}
+
+# ── GitHub CLI install help ──
+show_gh_install_help() {
+  echo ""
+  ui_section "INSTALAR GITHUB CLI"
+  ui_empty
+  ui_item "" "Windows: winget install GitHub.cli"
+  ui_item "" "   o: choco install gh"
+  ui_item "" ""
+  ui_item "" "macOS:   brew install gh"
+  ui_item "" "Linux:   https://github.com/cli/cli"
+  ui_item "" ""
+  ui_item "" "Después: gh auth login"
+  ui_empty
+  ui_section_end
+  echo ""
+  read -rp "  Presioná Enter para volver..."
 }
 
 register_project() {

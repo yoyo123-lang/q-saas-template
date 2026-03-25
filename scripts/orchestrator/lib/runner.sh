@@ -146,6 +146,14 @@ run_ci_check_and_fix() {
 3. Pusheá a origin con: git push -u origin ${branch_name}
 4. Creá un Pull Request con gh pr create --base main --head ${branch_name} --title 'S${session_num}: ${_current_session_name}' --body 'Sesión ${session_num} del roadmap - ${_current_session_name}'
 Si el branch ya existe, usá el existente. Si gh CLI no está disponible, solo pusheá."
+      elif [ "$ORCH_BRANCH_STRATEGY" = "roadmap-branch" ]; then
+        local branch_name="roadmap/${slug}"
+        echo -e "  ${BOLD}▸ Push (roadmap branch)${RESET}"
+        push_prompt="Build, lint y tests pasaron. Hacé lo siguiente en orden:
+1. Commiteá todos los cambios pendientes (si los hay)
+2. Si no estás en el branch '${branch_name}', switcheá a él (crealo si no existe con: git checkout -b ${branch_name})
+3. Pusheá a origin con: git push -u origin ${branch_name}
+NO crees Pull Request — se crea al final del roadmap completo."
       else
         echo -e "  ${BOLD}▸ Push${RESET}"
         push_prompt="Build, lint y tests pasaron. Commiteá los cambios pendientes (si los hay) y pusheá a origin."
@@ -165,10 +173,13 @@ Si el branch ya existe, usá el existente. Si gh CLI no está disponible, solo p
         fi
       done
 
-      # If PR strategy, switch back to main for next session
+      # Post-push: handle branch switching
       if [ "$ORCH_BRANCH_STRATEGY" = "pr" ]; then
         (cd "$project_path" && git checkout main 2>/dev/null || git checkout master 2>/dev/null) || true
         ui_ok "PR creado en branch session/${slug}/s${session_num}"
+      elif [ "$ORCH_BRANCH_STRATEGY" = "roadmap-branch" ]; then
+        # Stay on roadmap branch — next session continues here
+        ui_ok "Push a roadmap/${slug} completado (S${session_num})"
       else
         ui_ok "Build + push completado"
       fi

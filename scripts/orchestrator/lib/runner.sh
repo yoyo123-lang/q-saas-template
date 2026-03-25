@@ -119,6 +119,7 @@ run_ci_check_and_fix() {
 
     # Check if it looks like it passed (heuristic: exit code 0)
     if [ $ci_exit -eq 0 ]; then
+      telemetry_ci_attempt "$attempt" "$ORCH_CI_MAX_RETRIES" "pass"
       # Try push
       echo -e "  ${BOLD}▸ Push${RESET}"
       local push_prompt="Build, lint y tests pasaron. Commiteá los cambios pendientes (si los hay) y pusheá a origin."
@@ -143,9 +144,12 @@ run_ci_check_and_fix() {
     fi
 
     # CI failed — try to fix
+    telemetry_ci_attempt "$attempt" "$ORCH_CI_MAX_RETRIES" "fail"
+
     if [ $attempt -lt "$ORCH_CI_MAX_RETRIES" ]; then
       echo -e "  ${YELLOW}▸ CI falló — reparando (intento ${attempt}/${ORCH_CI_MAX_RETRIES})${RESET}"
       save_state "$slug" "$session_num" "ci-fix-${attempt}" "running"
+      telemetry_ci_attempt "$attempt" "$ORCH_CI_MAX_RETRIES" "fix_attempted"
 
       local fix_prompt="Build, lint o tests fallaron. Leé los errores del último intento, corregí los problemas, y commiteá las correcciones. NO pushees."
       run_claude "$project_path" "$fix_prompt" "$model" "$ORCH_MAX_TURNS_CI_FIX" \
@@ -203,6 +207,9 @@ run_session_cambio_grande() {
   ui_info "Modelo: ${model} | Pasos: ${total_steps} | CI retries: ${ORCH_CI_MAX_RETRIES}"
   echo ""
 
+  # ── Telemetry: start run ──
+  telemetry_start_run "$slug" "$session_num" "$model"
+
   local sessions_dir
   sessions_dir=$(find_session_prompts_dir "$project_path")
   local prompts_dir
@@ -218,6 +225,7 @@ run_session_cambio_grande() {
     session_file=$(printf "${sessions_dir}/session-%02d.md" "$session_num")
   fi
 
+  telemetry_step_start "implement" "$ORCH_MAX_TURNS_IMPLEMENT"
   local step_exit=0
   if [ -n "$session_file" ] && [ -f "$session_file" ]; then
     run_claude_file "$project_path" "$session_file" "$model" "$ORCH_MAX_TURNS_IMPLEMENT" \
@@ -229,10 +237,14 @@ run_session_cambio_grande() {
   fi
 
   if [ $step_exit -ne 0 ]; then
+    telemetry_step_end "implement" "$step_exit" "failed"
     _handle_step_fail "implementación" || {
       save_state "$slug" "$session_num" "implement" "failed"
+      telemetry_end_run "failed"
       return 1
     }
+  else
+    telemetry_step_end "implement" "0" "success"
   fi
 
   # ── Step: Role review ──
@@ -240,6 +252,7 @@ run_session_cambio_grande() {
     current_step=$((current_step + 1))
     echo -e "  ${BOLD}▸ Paso ${current_step}/${total_steps}: Revisión por roles${RESET}"
     save_state "$slug" "$session_num" "roles" "running"
+    telemetry_step_start "roles" "$ORCH_MAX_TURNS_SUPPORT"
 
     step_exit=0
     if [ -n "$prompts_dir" ] && [ -f "${prompts_dir}/apply-roles.md" ]; then
@@ -252,10 +265,14 @@ run_session_cambio_grande() {
     fi
 
     if [ $step_exit -ne 0 ]; then
+      telemetry_step_end "roles" "$step_exit" "failed"
       _handle_step_fail "revisión por roles" || {
         save_state "$slug" "$session_num" "roles" "failed"
+        telemetry_end_run "failed"
         return 1
       }
+    else
+      telemetry_step_end "roles" "0" "success"
     fi
   fi
 
@@ -264,6 +281,7 @@ run_session_cambio_grande() {
     current_step=$((current_step + 1))
     echo -e "  ${BOLD}▸ Paso ${current_step}/${total_steps}: Corrección de hallazgos${RESET}"
     save_state "$slug" "$session_num" "fix" "running"
+    telemetry_step_start "fix" "$ORCH_MAX_TURNS_SUPPORT"
 
     step_exit=0
     if [ -n "$prompts_dir" ] && [ -f "${prompts_dir}/fix-findings.md" ]; then
@@ -276,10 +294,14 @@ run_session_cambio_grande() {
     fi
 
     if [ $step_exit -ne 0 ]; then
+      telemetry_step_end "fix" "$step_exit" "failed"
       _handle_step_fail "corrección de hallazgos" || {
         save_state "$slug" "$session_num" "fix" "failed"
+        telemetry_end_run "failed"
         return 1
       }
+    else
+      telemetry_step_end "fix" "0" "success"
     fi
   fi
 
@@ -288,6 +310,7 @@ run_session_cambio_grande() {
     current_step=$((current_step + 1))
     echo -e "  ${BOLD}▸ Paso ${current_step}/${total_steps}: Documentación${RESET}"
     save_state "$slug" "$session_num" "document" "running"
+    telemetry_step_start "document" "$ORCH_MAX_TURNS_SUPPORT"
 
     step_exit=0
     if [ -n "$prompts_dir" ] && [ -f "${prompts_dir}/document.md" ]; then
@@ -300,10 +323,14 @@ run_session_cambio_grande() {
     fi
 
     if [ $step_exit -ne 0 ]; then
+      telemetry_step_end "document" "$step_exit" "failed"
       _handle_step_fail "documentación" || {
         save_state "$slug" "$session_num" "document" "failed"
+        telemetry_end_run "failed"
         return 1
       }
+    else
+      telemetry_step_end "document" "0" "success"
     fi
   fi
 
@@ -311,13 +338,18 @@ run_session_cambio_grande() {
   current_step=$((current_step + 1))
   echo -e "  ${BOLD}▸ Paso ${current_step}/${total_steps}: Build + Push${RESET}"
   save_state "$slug" "$session_num" "build-push" "running"
+  telemetry_step_start "build_push" "$ORCH_MAX_TURNS_BUILD"
 
   if run_ci_check_and_fix "$project_path" "$model" "$slug" "$log_dir" "$timestamp" "$session_num"; then
+    telemetry_step_end "build_push" "0" "success"
     save_state "$slug" "$session_num" "completed" "completed"
+    telemetry_end_run "completed"
     echo ""
     echo -e "  ${GREEN}✓ Sesión ${session_num} completada${RESET}"
   else
+    telemetry_step_end "build_push" "1" "failed"
     save_state "$slug" "$session_num" "build-push" "failed"
+    telemetry_end_run "failed"
     echo ""
     echo -e "  ${RED}✗ Sesión ${session_num} falló en build/push${RESET}"
     return 1

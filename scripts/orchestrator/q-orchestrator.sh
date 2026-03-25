@@ -21,6 +21,7 @@ source "${SCRIPT_DIR}/lib/ui.sh"
 source "${SCRIPT_DIR}/lib/projects.sh"
 source "${SCRIPT_DIR}/lib/config.sh"
 source "${SCRIPT_DIR}/lib/sessions.sh"
+source "${SCRIPT_DIR}/lib/telemetry.sh"
 source "${SCRIPT_DIR}/lib/runner.sh"
 
 # ── Help ──
@@ -890,7 +891,7 @@ main_menu() {
       "Gestionar proyectos" \
       "Configuración" \
       "Diagnóstico del entorno" \
-      "Ver logs" \
+      "Logs y telemetría" \
       "Salir"
 
     case "$MENU_CHOICE" in
@@ -903,13 +904,38 @@ main_menu() {
       2) manage_projects ;;
       3) manage_config ;;
       4) run_diagnostic ;;
-      5) view_logs ;;
+      5) manage_logs ;;
       6) echo ""; echo "  Hasta luego!"; echo ""; exit 0 ;;
     esac
   done
 }
 
-# ── View logs ──
+# ── Logs & telemetry management ──
+manage_logs() {
+  while true; do
+    ui_header
+
+    ui_menu "LOGS Y TELEMETRÍA" \
+      "Ver logs recientes" \
+      "Exportar diagnóstico de un proyecto" \
+      "Exportar diagnóstico de todos los proyectos" \
+      "Ver reportes exportados" \
+      "Volver al menú principal"
+
+    case "$MENU_CHOICE" in
+      1) view_logs ;;
+      2) export_single_project ;;
+      3)
+        export_all_diagnostics
+        echo ""
+        read -rp "  Presioná Enter para volver..."
+        ;;
+      4) view_exports ;;
+      5) return ;;
+    esac
+  done
+}
+
 view_logs() {
   ui_header
   local log_dir="${CONFIG_DIR}/logs"
@@ -949,6 +975,92 @@ view_logs() {
     less "$found"
   else
     ui_error "Log no encontrado."
+    read -rp "  Presioná Enter para volver..."
+  fi
+}
+
+export_single_project() {
+  local count
+  count=$(project_count)
+
+  if [ "$count" -eq 0 ]; then
+    ui_warn "No hay proyectos registrados."
+    echo ""
+    read -rp "  Presioná Enter para volver..."
+    return
+  fi
+
+  # Build options
+  local options=()
+  local slugs=()
+  while IFS='|' read -r idx slug path repo branch; do
+    options+=("${slug}")
+    slugs+=("${slug}")
+  done < <(list_projects)
+
+  ui_menu "EXPORTAR DIAGNÓSTICO" "${options[@]}"
+  local selected_slug="${slugs[$((MENU_CHOICE - 1))]}"
+
+  echo ""
+  ui_info "Generando reporte de diagnóstico para ${selected_slug}..."
+
+  local report
+  report=$(export_diagnostic_report "$selected_slug")
+
+  if [ -n "$report" ] && [ -f "$report" ]; then
+    ui_ok "Reporte generado: ${report}"
+    echo ""
+    if ui_confirm "¿Ver el reporte ahora?"; then
+      less "$report"
+    fi
+  else
+    ui_warn "No hay datos de telemetría para ${selected_slug}."
+    ui_info "Los datos se recopilan cuando ejecutás sesiones."
+  fi
+
+  echo ""
+  read -rp "  Presioná Enter para volver..."
+}
+
+view_exports() {
+  ui_header
+  local export_dir="${CONFIG_DIR}/exports"
+
+  if [ ! -d "$export_dir" ] || [ -z "$(ls -A "$export_dir" 2>/dev/null)" ]; then
+    ui_warn "No hay reportes exportados todavía."
+    echo ""
+    read -rp "  Presioná Enter para volver..."
+    return
+  fi
+
+  ui_section "REPORTES EXPORTADOS"
+  ui_empty
+
+  local export_files=()
+  while IFS= read -r f; do
+    export_files+=("$f")
+    local basename
+    basename=$(basename "$f")
+    ui_item "" "$basename"
+  done < <(find "$export_dir" -name "*.md" -type f | sort -r | head -15)
+
+  ui_empty
+  ui_section_end
+
+  echo ""
+  ui_prompt "Nombre del reporte a ver (Enter para volver):"
+  read -r report_name
+
+  if [ -z "$report_name" ]; then
+    return
+  fi
+
+  local found
+  found=$(find "$export_dir" -name "*${report_name}*" -type f | head -1)
+  if [ -n "$found" ]; then
+    less "$found"
+  else
+    ui_error "Reporte no encontrado."
     read -rp "  Presioná Enter para volver..."
   fi
 }

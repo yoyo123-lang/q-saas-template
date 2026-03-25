@@ -1207,6 +1207,7 @@ main_menu() {
       "Configuración" \
       "Diagnóstico del entorno" \
       "Logs y telemetría" \
+      "Issues (directivas del Board)" \
       "Auto-mejora (Claude analiza y mejora el orquestador)" \
       "Salir"
 
@@ -1221,10 +1222,301 @@ main_menu() {
       3) manage_config ;;
       4) run_diagnostic ;;
       5) manage_logs ;;
-      6) run_self_improve ;;
-      7) echo ""; echo "  Hasta luego!"; echo ""; exit 0 ;;
+      6) manage_issues_board ;;
+      7) run_self_improve ;;
+      8) echo ""; echo "  Hasta luego!"; echo ""; exit 0 ;;
     esac
   done
+}
+
+# ══════════════════════════════════════════════════════════════
+# ISSUES BOARD MENU
+# ══════════════════════════════════════════════════════════════
+
+# ── Issues board main submenu ──
+manage_issues_board() {
+  # Validate ORCH_ISSUES_REPOS is configured — show warning but always show menu
+  if [ -z "${ORCH_ISSUES_REPOS:-}" ]; then
+    ui_header
+    ui_warn "ORCH_ISSUES_REPOS no está configurado."
+    ui_info "Agregá los repos en ~/.q-orchestrator/config.sh:"
+    ui_info '  ORCH_ISSUES_REPOS="owner/repo1 owner/repo2"'
+    echo ""
+    read -rp "  Presioná Enter para volver al menú principal..."
+    return
+  fi
+
+  while true; do
+    ui_header
+
+    ui_menu "ISSUES — DIRECTIVAS DEL BOARD" \
+      "Ver issues pendientes" \
+      "Procesar issues (batch)" \
+      "Ver estado de issues procesados" \
+      "Ver morning reports" \
+      "Resetear estado de un issue" \
+      "Volver al menú principal"
+
+    case "$MENU_CHOICE" in
+      1) view_pending_issues ;;
+      2)
+        select_model
+        run_issues_mode "" "" "$SELECTED_MODEL"
+        echo ""
+        read -rp "  Presioná Enter para volver..."
+        ;;
+      3) view_issues_state ;;
+      4) view_morning_reports ;;
+      5) reset_issue_state ;;
+      6) return ;;
+    esac
+  done
+}
+
+# ── View pending issues (fetch + display, no processing) ──
+view_pending_issues() {
+  ui_header
+
+  if ! command -v gh &>/dev/null; then
+    ui_warn "gh CLI no encontrado — requerido para obtener issues."
+    ui_info "Instalá con: https://cli.github.com/"
+    echo ""
+    read -rp "  Presioná Enter para volver..."
+    return
+  fi
+
+  ui_info "Obteniendo issues de: ${ORCH_ISSUES_REPOS}"
+  echo ""
+
+  local issues_raw
+  issues_raw=$(fetch_all_issues ${ORCH_ISSUES_REPOS})
+
+  if [ -z "$issues_raw" ]; then
+    ui_section "ISSUES PENDIENTES"
+    ui_empty
+    ui_item "" "No se encontraron issues con label '${ORCH_ISSUES_LABEL:-board-directive}'"
+    ui_empty
+    ui_section_end
+    echo ""
+    read -rp "  Presioná Enter para volver..."
+    return
+  fi
+
+  local prioritized
+  prioritized=$(echo "$issues_raw" | prioritize_issues)
+
+  ui_section "ISSUES PENDIENTES"
+  ui_empty
+
+  local shown=0
+  while IFS='|' read -r repo number directive_id bu_id type priority deadline title instr_b64 req_b64; do
+    [ -z "$number" ] && continue
+
+    # Mark already-processed issues
+    local status_mark=""
+    if is_issue_already_processed "$repo" "$number"; then
+      status_mark=" [procesado]"
+    fi
+
+    # Truncate title and repo for display (max widths to fit box)
+    local repo_short="${repo##*/}"
+    local title_short="${title:0:20}"
+    [ "${#title}" -gt 20 ] && title_short="${title_short}.."
+
+    ui_item "#${number}" "$(printf '%-12s %-8s %-14s %s%s' \
+      "$repo_short" "${priority:-?}" "${type:-UNKNOWN}" "$title_short" "$status_mark")"
+    shown=$((shown + 1))
+  done <<< "$prioritized"
+
+  if [ "$shown" -eq 0 ]; then
+    ui_item "" "No hay issues."
+  fi
+
+  ui_empty
+  ui_section_end
+  echo ""
+  read -rp "  Presioná Enter para volver..."
+}
+
+# ── View state of processed issues ──
+view_issues_state() {
+  ui_header
+  ui_section "ESTADO DE ISSUES PROCESADOS"
+  ui_empty
+
+  local state_base="${ISSUES_STATE_DIR}"
+
+  if [ ! -d "$state_base" ] || [ -z "$(ls -A "$state_base" 2>/dev/null)" ]; then
+    ui_item "" "No hay issues procesados todavía."
+    ui_empty
+    ui_section_end
+    echo ""
+    read -rp "  Presioná Enter para volver..."
+    return
+  fi
+
+  local found=0
+  while IFS= read -r state_file; do
+    [ -f "$state_file" ] || continue
+
+    local repo number status pr_url
+    repo=$(grep -o '"repo"[[:space:]]*:[[:space:]]*"[^"]*"' "$state_file" \
+      | sed 's/.*"\([^"]*\)".*/\1/' | head -1)
+    number=$(grep -o '"issue_number"[[:space:]]*:[[:space:]]*[0-9]*' "$state_file" \
+      | sed 's/.*:[[:space:]]*//' | head -1)
+    status=$(grep -o '"status"[[:space:]]*:[[:space:]]*"[^"]*"' "$state_file" \
+      | sed 's/.*"\([^"]*\)".*/\1/' | head -1)
+    pr_url=$(grep -o '"pr_url"[[:space:]]*:[[:space:]]*"[^"]*"' "$state_file" \
+      | sed 's/.*"\([^"]*\)".*/\1/' | head -1)
+
+    local repo_short="${repo##*/}"
+    local pr_display="${pr_url:-—}"
+    [ ${#pr_display} -gt 30 ] && pr_display="${pr_display:0:30}.."
+
+    ui_item "#${number:-?}" "$(printf '%-12s %-12s %s' \
+      "$repo_short" "${status:-?}" "$pr_display")"
+    found=$((found + 1))
+  done < <(find "$state_base" -name "*.json" -type f | sort)
+
+  if [ "$found" -eq 0 ]; then
+    ui_item "" "No hay archivos de estado."
+  fi
+
+  ui_empty
+  ui_section_end
+  echo ""
+  read -rp "  Presioná Enter para volver..."
+}
+
+# ── View morning reports ──
+view_morning_reports() {
+  ui_header
+  local reports_dir="${ORCH_ISSUES_REPORT_DIR:-${CONFIG_DIR}/reports}"
+
+  if [ ! -d "$reports_dir" ] || [ -z "$(ls -A "$reports_dir" 2>/dev/null)" ]; then
+    ui_warn "No hay morning reports todavía."
+    echo ""
+    read -rp "  Presioná Enter para volver..."
+    return
+  fi
+
+  ui_section "MORNING REPORTS"
+  ui_empty
+
+  local report_files=()
+  local i=1
+  while IFS= read -r f; do
+    report_files+=("$f")
+    local basename
+    basename=$(basename "$f")
+    ui_item "[${i}]" "$basename"
+    i=$((i + 1))
+  done < <(find "$reports_dir" -name "*.md" -o -name "*.txt" -o -name "*.json" \
+    2>/dev/null | sort -r | head -20)
+
+  ui_empty
+  ui_section_end
+  echo ""
+
+  if [ "${#report_files[@]}" -eq 0 ]; then
+    ui_warn "No se encontraron reportes."
+    read -rp "  Presioná Enter para volver..."
+    return
+  fi
+
+  ui_prompt "Número de reporte a ver (Enter para volver):"
+  read -r report_choice
+
+  if [ -z "$report_choice" ]; then
+    return
+  fi
+
+  if [[ "$report_choice" =~ ^[0-9]+$ ]] \
+    && [ "$report_choice" -ge 1 ] \
+    && [ "$report_choice" -le "${#report_files[@]}" ]; then
+    local selected="${report_files[$((report_choice - 1))]}"
+    less "$selected"
+  else
+    ui_error "Opción inválida."
+    read -rp "  Presioná Enter para volver..."
+  fi
+}
+
+# ── Reset state of a single processed issue ──
+reset_issue_state() {
+  ui_header
+  local state_base="${ISSUES_STATE_DIR}"
+
+  if [ ! -d "$state_base" ] || [ -z "$(ls -A "$state_base" 2>/dev/null)" ]; then
+    ui_warn "No hay issues procesados para resetear."
+    echo ""
+    read -rp "  Presioná Enter para volver..."
+    return
+  fi
+
+  ui_section "RESETEAR ESTADO DE ISSUE"
+  ui_empty
+
+  local state_files=()
+  local labels=()
+  local i=1
+  while IFS= read -r state_file; do
+    [ -f "$state_file" ] || continue
+
+    local repo number status
+    repo=$(grep -o '"repo"[[:space:]]*:[[:space:]]*"[^"]*"' "$state_file" \
+      | sed 's/.*"\([^"]*\)".*/\1/' | head -1)
+    number=$(grep -o '"issue_number"[[:space:]]*:[[:space:]]*[0-9]*' "$state_file" \
+      | sed 's/.*:[[:space:]]*//' | head -1)
+    status=$(grep -o '"status"[[:space:]]*:[[:space:]]*"[^"]*"' "$state_file" \
+      | sed 's/.*"\([^"]*\)".*/\1/' | head -1)
+
+    local repo_short="${repo##*/}"
+    local label="$(printf '#%-4s %-12s %s' "${number:-?}" "$repo_short" "${status:-?}")"
+    state_files+=("$state_file")
+    labels+=("$label")
+    ui_item "[${i}]" "$label"
+    i=$((i + 1))
+  done < <(find "$state_base" -name "*.json" -type f | sort)
+
+  ui_empty
+  ui_section_end
+  echo ""
+
+  if [ "${#state_files[@]}" -eq 0 ]; then
+    ui_warn "No se encontraron archivos de estado."
+    read -rp "  Presioná Enter para volver..."
+    return
+  fi
+
+  ui_prompt "Número de issue a resetear (Enter para cancelar):"
+  read -r reset_choice
+
+  if [ -z "$reset_choice" ]; then
+    return
+  fi
+
+  if ! [[ "$reset_choice" =~ ^[0-9]+$ ]] \
+    || [ "$reset_choice" -lt 1 ] \
+    || [ "$reset_choice" -gt "${#state_files[@]}" ]; then
+    ui_error "Opción inválida."
+    read -rp "  Presioná Enter para volver..."
+    return
+  fi
+
+  local target="${state_files[$((reset_choice - 1))]}"
+  local target_label="${labels[$((reset_choice - 1))]}"
+
+  echo ""
+  if ui_confirm "¿Resetear estado de '${target_label}'?"; then
+    rm -f "$target"
+    ui_ok "Estado reseteado. El issue podrá ser reprocesado."
+  else
+    ui_info "Cancelado."
+  fi
+
+  echo ""
+  read -rp "  Presioná Enter para volver..."
 }
 
 # ── Logs & telemetry management ──

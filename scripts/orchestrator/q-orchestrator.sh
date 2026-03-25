@@ -19,7 +19,9 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # ── Load libraries ──
 source "${SCRIPT_DIR}/lib/ui.sh"
 source "${SCRIPT_DIR}/lib/projects.sh"
+source "${SCRIPT_DIR}/lib/config.sh"
 source "${SCRIPT_DIR}/lib/sessions.sh"
+source "${SCRIPT_DIR}/lib/telemetry.sh"
 source "${SCRIPT_DIR}/lib/runner.sh"
 
 # ── Help ──
@@ -527,7 +529,7 @@ select_project() {
 # MODEL SELECTION
 # ══════════════════════════════════════════════════════════════
 
-SELECTED_MODEL="$DEFAULT_MODEL"
+SELECTED_MODEL="$ORCH_MODEL"
 
 select_model() {
   if [ -n "$ARG_MODEL" ]; then
@@ -535,15 +537,22 @@ select_model() {
     return
   fi
 
-  ui_menu "MODELO DE CLAUDE" \
+  # Show current default from config
+  local default_label="Sonnet"
+  [[ "$ORCH_MODEL" == *opus* ]] && default_label="Opus"
+  [[ "$ORCH_MODEL" == *haiku* ]] && default_label="Haiku"
+
+  ui_menu "MODELO DE CLAUDE (default: ${default_label})" \
     "Sonnet 4.6 (rápido, ~\$3-5/sesión)" \
     "Opus 4.6 (mejor calidad, ~\$15-25/sesión)" \
-    "Haiku 4.5 (económico, tareas simples)"
+    "Haiku 4.5 (económico, tareas simples)" \
+    "Usar default de config (${default_label})"
 
   case "$MENU_CHOICE" in
     1) SELECTED_MODEL="claude-sonnet-4-6" ;;
     2) SELECTED_MODEL="claude-opus-4-6" ;;
     3) SELECTED_MODEL="claude-haiku-4-5-20251001" ;;
+    4) SELECTED_MODEL="$ORCH_MODEL" ;;
   esac
 }
 
@@ -556,12 +565,22 @@ select_and_run_mode() {
   local slug="$SELECTED_SLUG"
   local model="$SELECTED_MODEL"
 
+  # ── Load project-specific config overrides ──
+  load_project_config "$project_path"
+
+  # ── Override model from config if user didn't pick via CLI ──
+  if [ -z "$ARG_MODEL" ] && [ "$model" = "claude-sonnet-4-6" ]; then
+    model="$ORCH_MODEL"
+  fi
+
   # ── Auto-pull: sync with remote before detecting capabilities ──
-  if [ -d "${project_path}/.git" ]; then
+  if [ "$ORCH_AUTO_PULL" = "true" ] && [ -d "${project_path}/.git" ]; then
     ui_info "Sincronizando con remoto..."
-    local current_branch
-    current_branch=$(cd "$project_path" && git symbolic-ref --short HEAD 2>/dev/null || echo "main")
-    (cd "$project_path" && git pull origin "$current_branch" --ff-only 2>/dev/null) || true
+    local pull_branch="${ORCH_PULL_BRANCH}"
+    if [ -z "$pull_branch" ]; then
+      pull_branch=$(cd "$project_path" && git symbolic-ref --short HEAD 2>/dev/null || echo "main")
+    fi
+    (cd "$project_path" && git pull origin "$pull_branch" --ff-only 2>/dev/null) || true
   fi
 
   local caps
@@ -786,6 +805,64 @@ run_mode_sesion() {
 # MAIN MENU
 # ══════════════════════════════════════════════════════════════
 
+# ── Configuration management ──
+manage_config() {
+  while true; do
+    ui_header
+    show_config
+
+    local global_config="${CONFIG_DIR}/config.sh"
+
+    ui_menu "CONFIGURACIÓN" \
+      "Ver configuración actual" \
+      "Generar/resetear config global" \
+      "Editar config global (abre editor)" \
+      "Volver al menú principal"
+
+    case "$MENU_CHOICE" in
+      1)
+        show_config
+        echo ""
+        read -rp "  Presioná Enter para volver..."
+        ;;
+      2)
+        local config_path
+        config_path=$(generate_default_config)
+        ui_ok "Config generada en: ${config_path}"
+        ui_info "Editala para personalizar los valores."
+        echo ""
+        read -rp "  Presioná Enter para volver..."
+        ;;
+      3)
+        if [ ! -f "$global_config" ]; then
+          generate_default_config > /dev/null
+        fi
+        # Try to open in editor
+        local editor="${EDITOR:-${VISUAL:-}}"
+        if [ -n "$editor" ]; then
+          "$editor" "$global_config"
+        elif command -v notepad &>/dev/null; then
+          notepad "$(_to_native_path "$global_config")" &
+          ui_info "Abierto en Notepad. Guardá y cerrá para aplicar."
+        elif command -v nano &>/dev/null; then
+          nano "$global_config"
+        elif command -v vi &>/dev/null; then
+          vi "$global_config"
+        else
+          ui_error "No se encontró editor. Editá manualmente: $global_config"
+        fi
+        # Reload config after editing
+        _config_loaded=false
+        load_config
+        ui_ok "Configuración recargada."
+        echo ""
+        read -rp "  Presioná Enter para volver..."
+        ;;
+      4) return ;;
+    esac
+  done
+}
+
 main_menu() {
   while true; do
     ui_header
@@ -812,8 +889,9 @@ main_menu() {
     ui_menu "MENÚ PRINCIPAL" \
       "Trabajar en un proyecto" \
       "Gestionar proyectos" \
+      "Configuración" \
       "Diagnóstico del entorno" \
-      "Ver logs" \
+      "Logs y telemetría" \
       "Salir"
 
     case "$MENU_CHOICE" in
@@ -824,14 +902,40 @@ main_menu() {
         fi
         ;;
       2) manage_projects ;;
-      3) run_diagnostic ;;
-      4) view_logs ;;
-      5) echo ""; echo "  Hasta luego!"; echo ""; exit 0 ;;
+      3) manage_config ;;
+      4) run_diagnostic ;;
+      5) manage_logs ;;
+      6) echo ""; echo "  Hasta luego!"; echo ""; exit 0 ;;
     esac
   done
 }
 
-# ── View logs ──
+# ── Logs & telemetry management ──
+manage_logs() {
+  while true; do
+    ui_header
+
+    ui_menu "LOGS Y TELEMETRÍA" \
+      "Ver logs recientes" \
+      "Exportar diagnóstico de un proyecto" \
+      "Exportar diagnóstico de todos los proyectos" \
+      "Ver reportes exportados" \
+      "Volver al menú principal"
+
+    case "$MENU_CHOICE" in
+      1) view_logs ;;
+      2) export_single_project ;;
+      3)
+        export_all_diagnostics
+        echo ""
+        read -rp "  Presioná Enter para volver..."
+        ;;
+      4) view_exports ;;
+      5) return ;;
+    esac
+  done
+}
+
 view_logs() {
   ui_header
   local log_dir="${CONFIG_DIR}/logs"
@@ -875,12 +979,99 @@ view_logs() {
   fi
 }
 
+export_single_project() {
+  local count
+  count=$(project_count)
+
+  if [ "$count" -eq 0 ]; then
+    ui_warn "No hay proyectos registrados."
+    echo ""
+    read -rp "  Presioná Enter para volver..."
+    return
+  fi
+
+  # Build options
+  local options=()
+  local slugs=()
+  while IFS='|' read -r idx slug path repo branch; do
+    options+=("${slug}")
+    slugs+=("${slug}")
+  done < <(list_projects)
+
+  ui_menu "EXPORTAR DIAGNÓSTICO" "${options[@]}"
+  local selected_slug="${slugs[$((MENU_CHOICE - 1))]}"
+
+  echo ""
+  ui_info "Generando reporte de diagnóstico para ${selected_slug}..."
+
+  local report
+  report=$(export_diagnostic_report "$selected_slug")
+
+  if [ -n "$report" ] && [ -f "$report" ]; then
+    ui_ok "Reporte generado: ${report}"
+    echo ""
+    if ui_confirm "¿Ver el reporte ahora?"; then
+      less "$report"
+    fi
+  else
+    ui_warn "No hay datos de telemetría para ${selected_slug}."
+    ui_info "Los datos se recopilan cuando ejecutás sesiones."
+  fi
+
+  echo ""
+  read -rp "  Presioná Enter para volver..."
+}
+
+view_exports() {
+  ui_header
+  local export_dir="${CONFIG_DIR}/exports"
+
+  if [ ! -d "$export_dir" ] || [ -z "$(ls -A "$export_dir" 2>/dev/null)" ]; then
+    ui_warn "No hay reportes exportados todavía."
+    echo ""
+    read -rp "  Presioná Enter para volver..."
+    return
+  fi
+
+  ui_section "REPORTES EXPORTADOS"
+  ui_empty
+
+  local export_files=()
+  while IFS= read -r f; do
+    export_files+=("$f")
+    local basename
+    basename=$(basename "$f")
+    ui_item "" "$basename"
+  done < <(find "$export_dir" -name "*.md" -type f | sort -r | head -15)
+
+  ui_empty
+  ui_section_end
+
+  echo ""
+  ui_prompt "Nombre del reporte a ver (Enter para volver):"
+  read -r report_name
+
+  if [ -z "$report_name" ]; then
+    return
+  fi
+
+  local found
+  found=$(find "$export_dir" -name "*${report_name}*" -type f | head -1)
+  if [ -n "$found" ]; then
+    less "$found"
+  else
+    ui_error "Reporte no encontrado."
+    read -rp "  Presioná Enter para volver..."
+  fi
+}
+
 # ══════════════════════════════════════════════════════════════
 # ENTRY POINT
 # ══════════════════════════════════════════════════════════════
 
 check_deps
 ensure_config
+load_config
 
 # If CLI args provide enough info, skip menu
 if [ -n "$ARG_PROJECT" ] && [ -n "$ARG_MODE" ]; then

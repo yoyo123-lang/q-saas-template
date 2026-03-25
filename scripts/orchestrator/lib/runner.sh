@@ -2,6 +2,9 @@
 # ── Claude CLI runner for q-orchestrator ──
 # All settings come from lib/config.sh (ORCH_* variables)
 
+# ── Stream filter script path ──
+_STREAM_FILTER="${BASH_SOURCE[0]%/*}/stream-filter.js"
+
 # ── Build claude command array in caller's scope ──
 # Sets: _CLAUDE_CMD array (must be declared by caller or used after call)
 _build_claude_cmd() {
@@ -16,9 +19,9 @@ _build_claude_cmd() {
     _CLAUDE_CMD+=(--dangerously-skip-permissions)
   fi
 
-  # Verbose mode — show tool calls and progress
+  # Verbose + stream-json for real-time progress
   if [ "$ORCH_VERBOSE" = "true" ]; then
-    _CLAUDE_CMD+=(--verbose)
+    _CLAUDE_CMD+=(--verbose --output-format stream-json)
   fi
 
   # Extra flags
@@ -40,8 +43,16 @@ run_claude() {
   _build_claude_cmd "$prompt" "$model" "$max_turns"
 
   local exit_code=0
+  local filter_args=()
   if [ -n "$log_file" ] && [ "$ORCH_SAVE_LOGS" = "true" ]; then
     mkdir -p "$(dirname "$log_file")"
+    filter_args=(--log "$log_file")
+  fi
+
+  if [ "$ORCH_VERBOSE" = "true" ] && [ -f "$_STREAM_FILTER" ] && command -v node &>/dev/null; then
+    # Stream JSON through filter for real-time readable output
+    (cd "$project_path" && "${_CLAUDE_CMD[@]}" 2>&1 | node "$_STREAM_FILTER" "${filter_args[@]}") || exit_code=$?
+  elif [ -n "$log_file" ] && [ "$ORCH_SAVE_LOGS" = "true" ]; then
     (cd "$project_path" && "${_CLAUDE_CMD[@]}" 2>&1 | tee "$log_file") || exit_code=$?
   else
     (cd "$project_path" && "${_CLAUDE_CMD[@]}" 2>&1) || exit_code=$?

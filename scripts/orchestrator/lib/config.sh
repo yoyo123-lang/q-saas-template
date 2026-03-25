@@ -23,6 +23,8 @@
 : "${ORCH_MAX_TURNS_IMPLEMENT:=80}"
 # Max turns for review/fix/document steps (lighter work)
 : "${ORCH_MAX_TURNS_SUPPORT:=40}"
+# Max turns for each severity fix pass (CRITICAL, HIGH, MEDIUM)
+: "${ORCH_MAX_TURNS_FIX_PASS:=50}"
 # Max turns for build+push step
 : "${ORCH_MAX_TURNS_BUILD:=30}"
 # Max turns for CI fix attempts
@@ -61,6 +63,10 @@
 : "${ORCH_PUSH_RETRIES:=4}"
 # Seconds for exponential backoff base (2, 4, 8, 16...)
 : "${ORCH_PUSH_BACKOFF_BASE:=2}"
+# Branch strategy: "direct" (push to current branch) or "pr" (create branch per session + PR)
+# "direct" = commits go straight to main/current branch
+# "pr"     = creates branch session/<slug>/s<num>, pushes there, creates PR via gh CLI
+: "${ORCH_BRANCH_STRATEGY:=direct}"
 
 # ── Logging ──
 # Save full session logs
@@ -134,6 +140,7 @@ generate_default_config() {
 # ── Turn limits ──
 # ORCH_MAX_TURNS_IMPLEMENT=80   # Main implementation step
 # ORCH_MAX_TURNS_SUPPORT=40     # Review, fix, document steps
+# ORCH_MAX_TURNS_FIX_PASS=50    # Per-severity fix pass (CRITICAL, HIGH, MEDIUM)
 # ORCH_MAX_TURNS_BUILD=30       # Build + push step
 # ORCH_MAX_TURNS_CI_FIX=50      # CI fix attempts
 
@@ -155,6 +162,7 @@ generate_default_config() {
 # ORCH_AUTO_PULL=true            # Pull before starting
 # ORCH_PUSH_RETRIES=4            # Retries on network failure
 # ORCH_PUSH_BACKOFF_BASE=2       # Exponential backoff base (seconds)
+# ORCH_BRANCH_STRATEGY="direct"  # "direct" = push to current branch, "pr" = branch + PR per session
 
 # ── Claude CLI ──
 # ORCH_CLAUDE_EXTRA_FLAGS=""     # Extra flags for claude CLI
@@ -176,6 +184,7 @@ show_config() {
   ui_item "" "Modelo:           ${ORCH_MODEL}"
   ui_item "" "Turnos impl:      ${ORCH_MAX_TURNS_IMPLEMENT}"
   ui_item "" "Turnos soporte:   ${ORCH_MAX_TURNS_SUPPORT}"
+  ui_item "" "Turnos fix/sev:   ${ORCH_MAX_TURNS_FIX_PASS}"
   ui_item "" "Turnos build:     ${ORCH_MAX_TURNS_BUILD}"
   ui_item "" "Turnos CI fix:    ${ORCH_MAX_TURNS_CI_FIX}"
   ui_empty
@@ -192,6 +201,7 @@ show_config() {
   ui_item "" "On CI exhaust:    ${ORCH_ON_CI_EXHAUST}"
   ui_empty
   ui_item "" "Auto pull:        ${ORCH_AUTO_PULL}"
+  ui_item "" "Branch strategy:  ${ORCH_BRANCH_STRATEGY}"
   ui_item "" "Skip perms:       ${ORCH_SKIP_PERMISSIONS}"
   ui_item "" "Verbose:          ${ORCH_VERBOSE}"
   ui_item "" "Extra flags:      ${ORCH_CLAUDE_EXTRA_FLAGS:-ninguno}"

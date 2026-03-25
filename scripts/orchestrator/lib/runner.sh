@@ -126,7 +126,7 @@ run_ci_check_and_fix() {
     # Run build + lint + test locally first
     save_state "$slug" "$session_num" "ci-check-${attempt}" "running"
 
-    local ci_prompt="Corré build, lint y tests del proyecto localmente. Reportá si pasan o fallan. NO pushees todavía."
+    local ci_prompt="Modo batch — no pidas confirmación. Corré build, lint y tests del proyecto localmente. Reportá si pasan o fallan. NO pushees todavía."
     local ci_exit=0
     run_claude "$project_path" "$ci_prompt" "$model" "$ORCH_MAX_TURNS_BUILD" \
       "${log_dir}/${timestamp}-s${session_num}-ci-check-${attempt}.log" || ci_exit=$?
@@ -183,7 +183,7 @@ Si el branch ya existe, usá el existente. Si gh CLI no está disponible, solo p
       save_state "$slug" "$session_num" "ci-fix-${attempt}" "running"
       telemetry_ci_attempt "$attempt" "$ORCH_CI_MAX_RETRIES" "fix_attempted"
 
-      local fix_prompt="Build, lint o tests fallaron. Leé los errores del último intento, corregí los problemas, y commiteá las correcciones. NO pushees."
+      local fix_prompt="Modo batch — no pidas confirmación. Build, lint o tests fallaron. Leé los errores del último intento, corregí los problemas, y commiteá las correcciones. NO pushees."
       run_claude "$project_path" "$fix_prompt" "$model" "$ORCH_MAX_TURNS_CI_FIX" \
         "${log_dir}/${timestamp}-s${session_num}-ci-fix-${attempt}.log" || true
     fi
@@ -263,7 +263,16 @@ run_session_cambio_grande() {
     run_claude_file "$project_path" "$session_file" "$model" "$ORCH_MAX_TURNS_IMPLEMENT" \
       "${log_dir}/${timestamp}-s${session_num}-implement.log" || step_exit=$?
   else
-    local prompt="Leé ROADMAP.md y ejecutá la Sesión ${session_num}: ${session_name}. Seguí el proceso de /project:cambio-grande. TDD obligatorio. Un commit por tarea atómica."
+    local prompt="Estás corriendo en modo batch desatendido. NO pidas confirmación, NO esperes aprobación, NO crees planes sin implementar. Ejecutá directamente.
+
+Leé ROADMAP.md, buscá la Sesión ${session_num}: ${session_name}, y ejecutá TODA la implementación descrita ahí.
+
+Reglas:
+- Implementá directamente, commit por tarea atómica
+- Si hay un IMPLEMENTATION_PLAN.md, seguilo. Si no, implementá las etapas del ROADMAP
+- TDD obligatorio para lógica de negocio
+- NO te detengas a preguntar o pedir aprobación — tomá las decisiones técnicas razonables y seguí
+- Si encontrás ambiguedad, elegí la opción más simple y documentá la decisión en un comentario"
     run_claude "$project_path" "$prompt" "$model" "$ORCH_MAX_TURNS_IMPLEMENT" \
       "${log_dir}/${timestamp}-s${session_num}-implement.log" || step_exit=$?
   fi
@@ -291,7 +300,7 @@ run_session_cambio_grande() {
       run_claude_file "$project_path" "${prompts_dir}/apply-roles.md" "$model" "$ORCH_MAX_TURNS_SUPPORT" \
         "${log_dir}/${timestamp}-s${session_num}-roles.log" || step_exit=$?
     else
-      local prompt="Revisá el código que acabás de escribir aplicando los roles de docs/roles/ (si existen). Code review obligatorio. Devolvé hallazgos por severidad."
+      local prompt="Modo batch — no pidas confirmación. Revisá los cambios de la Sesión ${session_num} (mirá git log --oneline -20 para identificar los commits recientes). Aplicá los roles de docs/roles/ (si existen). Generá un informe en docs/reviews/ con hallazgos clasificados por severidad: CRÍTICO, ALTO, MEDIO, BAJO. Devolvé un resumen con conteo por severidad."
       run_claude "$project_path" "$prompt" "$model" "$ORCH_MAX_TURNS_SUPPORT" \
         "${log_dir}/${timestamp}-s${session_num}-roles.log" || step_exit=$?
     fi

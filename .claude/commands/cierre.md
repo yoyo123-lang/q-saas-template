@@ -127,3 +127,4 @@ Sugerile al usuario un nombre descriptivo para la sesión:
 - Si el build falla, no cerrar. Arreglar primero.
 - El SESSION_LOG es para la PRÓXIMA sesión. Escribilo pensando en alguien que arranca desde cero.
 - Ser breve. El cierre no debería tomar más de 2-3 minutos.
+- Si el proyecto tiene roadmap con specs (`sessions/`), siempre revisar si la spec siguiente necesita actualización. No cerrar sin verificar.

@@ -60,3 +60,35 @@ Resolver discrepancias entre documentación y código, completar funcionalidad i
 - [x] IMPLEMENTATION_PLAN.md actualizado con estado real de cada fase
 - [x] SESSION_LOG.md actualizado
 - [x] BLUEPRINT.example.md creado como ejemplo de referencia
+
+---
+
+## Sesión 3 — 2026-03-25 — Planificación en dos fases (roadmap)
+
+### Objetivo
+Resolver el problema de sesiones truncadas cuando se planifican proyectos grandes. Dividir la planificación en dos fases: roadmap (meta-planificación) + plan detallado por sesión.
+
+### Completado esta sesión
+- [x] Nuevo skill `/project:roadmap` — meta-planificación para proyectos grandes
+- [x] Detección automática de escala en `CLAUDE.md` — tabla que decide si necesita roadmap, cambio-grande, o plan inline
+- [x] Sección "Planificación en dos fases" en `docs/PLANNING.md` con flujo completo, orden canónico de construcción para SaaS, y protocolo de handoff entre sesiones
+- [x] `/project:sesion` lee `ROADMAP.md` y muestra progreso al iniciar
+- [x] `/project:cambio-grande` sugiere roadmap si detecta proyecto completo (Paso 0)
+- [x] Template para "construí este SaaS" en `docs/COMO_PEDIR.md`
+- [x] Roadmap como actividad estimable en `docs/ESTIMATION.md`
+- [x] PR creado: #9
+
+### Archivos modificados
+- `.claude/commands/roadmap.md` — nuevo
+- `.claude/commands/sesion.md` — modificado
+- `.claude/commands/cambio-grande.md` — modificado
+- `CLAUDE.md` — modificado
+- `docs/PLANNING.md` — modificado
+- `docs/COMO_PEDIR.md` — modificado
+- `docs/ESTIMATION.md` — modificado
+
+#### Handoff para la próxima sesión
+- **Completado**: sistema de planificación en dos fases documentado y conectado
+- **Próxima sesión**: testear el flujo completo con un proyecto real (pedir "construí un SaaS para X" y verificar que se dispare el roadmap)
+- **Decisiones que afectan lo que sigue**: el `ROADMAP.md` se sobreescribe por proyecto, no se acumula
+- **Archivos clave para retomar**: `CLAUDE.md` (tabla de escala), `.claude/commands/roadmap.md` (skill)

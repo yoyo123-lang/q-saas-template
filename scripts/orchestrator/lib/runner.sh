@@ -300,13 +300,14 @@ Aunque git status diga 'nothing to commit', SIEMPRE ejecutá git push para subir
 
     if [ $attempt -lt "$ORCH_CI_MAX_RETRIES" ]; then
       echo -e "  ${YELLOW}▸ CI falló — reparando (intento ${attempt}/${ORCH_CI_MAX_RETRIES})${RESET}"
-      save_state "$slug" "$session_num" "ci-fix-${attempt}" "running"
+      save_state "$slug" "$session_num" "ci-fix-${attempt}" "running" || true
       telemetry_ci_attempt "$attempt" "$ORCH_CI_MAX_RETRIES" "fix_attempted"
 
       local fix_prompt="Modo batch — no pidas confirmación. Build, lint o tests fallaron. Leé los errores del último intento, corregí los problemas, y commiteá las correcciones. NO pushees."
       run_claude "$project_path" "$fix_prompt" "$model" "$ORCH_MAX_TURNS_CI_FIX" \
         "${log_dir}/${timestamp}-s${session_num}-ci-fix-${attempt}.log" || true
     fi
+    continue
   done
 
   # Exhausted all retries

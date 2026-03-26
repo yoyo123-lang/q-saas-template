@@ -773,6 +773,8 @@ run_mode_continue() {
   case "$MENU_CHOICE" in
     1)
       # Auto-continue: run all pending sessions sequentially
+      # Each call is wrapped with error handling so a failed session
+      # breaks the loop instead of killing the script (set -e).
       echo ""
       ui_info "Modo automático: ${#pending_indices[@]} sesiones pendientes."
       for pidx in "${pending_indices[@]}"; do
@@ -783,14 +785,17 @@ run_mode_continue() {
         echo -e "  ${BOLD}  SESIÓN ${snum}: ${sname}${RESET}"
         echo -e "  ${BOLD}══════════════════════════════════════════${RESET}"
         echo ""
-        run_session_cambio_grande "$project_path" "$snum" "$sname" "$model" "$slug"
+        if ! run_session_cambio_grande "$project_path" "$snum" "$sname" "$model" "$slug"; then
+          ui_warn "Sesión ${snum} falló — deteniendo modo automático."
+          break
+        fi
       done
       echo ""
-      ui_ok "Todas las sesiones pendientes completadas."
+      ui_ok "Ejecución automática finalizada."
       read -rp "  Presioná Enter para continuar..."
       ;;
     2)
-      run_session_cambio_grande "$project_path" "$next_num" "$next_name" "$model" "$slug"
+      run_session_cambio_grande "$project_path" "$next_num" "$next_name" "$model" "$slug" || true
       echo ""
       read -rp "  Presioná Enter para continuar..."
       ;;
@@ -809,7 +814,7 @@ run_mode_continue() {
         read -rp "  Presioná Enter para volver..."
         return
       fi
-      run_session_cambio_grande "$project_path" "$chosen_num" "$chosen_name" "$model" "$slug"
+      run_session_cambio_grande "$project_path" "$chosen_num" "$chosen_name" "$model" "$slug" || true
       echo ""
       read -rp "  Presioná Enter para continuar..."
       ;;

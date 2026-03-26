@@ -145,12 +145,6 @@ NO pushees todavía. Solo corré los checks y reportá."
     run_claude "$project_path" "$ci_prompt" "$model" "$ORCH_MAX_TURNS_BUILD" \
       "${log_dir}/${timestamp}-s${session_num}-ci-check-${attempt}.log" || ci_exit=$?
 
-    # Also verify by checking if there are unpushed commits (belt-and-suspenders)
-    local has_unpushed=false
-    local unpushed_count=0
-    unpushed_count=$(cd "$project_path" && git log --oneline "@{upstream}..HEAD" 2>/dev/null | wc -l | tr -d ' ') || unpushed_count=0
-    [ "$unpushed_count" -gt 0 ] && has_unpushed=true
-
     # Check if CI passed:
     # - Primary: Claude CLI exit code (now reliable with explicit exit 0/1)
     # - Fallback: if Claude exited 0 but didn't run the final bash command,
@@ -206,15 +200,20 @@ Aunque git status diga 'nothing to commit', SIEMPRE ejecutá git push para subir
         fi
       done
 
-      # Fallback: if Claude didn't push, try direct git push
-      if [ "$push_ok" = false ] || [ "$has_unpushed" = true ]; then
-        local still_unpushed=0
-        still_unpushed=$(cd "$project_path" && git log --oneline "@{upstream}..HEAD" 2>/dev/null | wc -l | tr -d ' ') || still_unpushed=0
-        if [ "$still_unpushed" -gt 0 ]; then
-          echo -e "  ${YELLOW}▸ Fallback: push directo (${still_unpushed} commits sin pushear)${RESET}"
-          (cd "$project_path" && git push -u origin HEAD 2>&1) || {
-            ui_warn "Fallback push falló — verificá manualmente"
-          }
+      # Fallback: always try direct git push as safety net
+      # This catches cases where Claude didn't actually push, or where
+      # there was no upstream tracking branch configured
+      local fallback_result=0
+      local fallback_output=""
+      fallback_output=$(cd "$project_path" && git push -u origin HEAD 2>&1) || fallback_result=$?
+      if [ $fallback_result -ne 0 ]; then
+        # Only warn if it's not "everything up-to-date"
+        if ! echo "$fallback_output" | grep -qi "up-to-date\|up to date"; then
+          echo -e "  ${YELLOW}▸ Fallback push: ${fallback_output}${RESET}"
+        fi
+      else
+        if ! echo "$fallback_output" | grep -qi "up-to-date\|up to date"; then
+          echo -e "  ${CYAN}▸ Fallback push ejecutado correctamente${RESET}"
         fi
       fi
 

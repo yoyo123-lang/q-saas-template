@@ -126,45 +126,78 @@ run_ci_check_and_fix() {
     # Run build + lint + test locally first
     save_state "$slug" "$session_num" "ci-check-${attempt}" "running"
 
-    local ci_prompt="Modo batch — no pidas confirmación. Corré build, lint y tests del proyecto localmente. Reportá si pasan o fallan. NO pushees todavía."
+    # CI prompt instructs Claude to exit with non-zero if any check fails.
+    # This ensures the orchestrator can distinguish pass from fail —
+    # previously we relied on Claude CLI exit code which is always 0
+    # even when the commands Claude ran internally failed.
+    local ci_prompt="Modo batch — no pidas confirmación. Corré build, lint y tests del proyecto localmente.
+
+IMPORTANTE: Al final de tu ejecución, tu ÚLTIMA acción debe ser ejecutar un comando Bash.
+- Si TODOS los checks pasaron (build OK, tests OK, lint OK o no hay linter configurado):
+  ejecutá: bash -c 'echo CI_RESULT=PASS && exit 0'
+- Si ALGUNO falló:
+  ejecutá: bash -c 'echo CI_RESULT=FAIL && exit 1'
+
+Esto determina si el orquestador continúa con el push o intenta reparar. Es CRÍTICO que lo hagas.
+
+NO pushees todavía. Solo corré los checks y reportá."
     local ci_exit=0
     run_claude "$project_path" "$ci_prompt" "$model" "$ORCH_MAX_TURNS_BUILD" \
       "${log_dir}/${timestamp}-s${session_num}-ci-check-${attempt}.log" || ci_exit=$?
 
-    # Check if it looks like it passed (heuristic: exit code 0)
+    # Also verify by checking if there are unpushed commits (belt-and-suspenders)
+    local has_unpushed=false
+    local unpushed_count=0
+    unpushed_count=$(cd "$project_path" && git log --oneline "@{upstream}..HEAD" 2>/dev/null | wc -l | tr -d ' ') || unpushed_count=0
+    [ "$unpushed_count" -gt 0 ] && has_unpushed=true
+
+    # Check if CI passed:
+    # - Primary: Claude CLI exit code (now reliable with explicit exit 0/1)
+    # - Fallback: if Claude exited 0 but didn't run the final bash command,
+    #   we still proceed to push (better to push than to lose work)
     if [ $ci_exit -eq 0 ]; then
       telemetry_ci_attempt "$attempt" "$ORCH_CI_MAX_RETRIES" "pass"
 
-      # Determine push strategy
+      # Determine push strategy and prompt
       local push_prompt=""
       if [ "$ORCH_BRANCH_STRATEGY" = "pr" ]; then
         local branch_name="session/${slug}/s${session_num}"
         echo -e "  ${BOLD}▸ Push (branch + PR)${RESET}"
-        push_prompt="Build, lint y tests pasaron. Hacé lo siguiente en orden:
-1. Commiteá todos los cambios pendientes (si los hay)
+        push_prompt="Modo batch — no pidas confirmación. Hacé lo siguiente en orden:
+1. Commiteá todos los cambios pendientes con git add y git commit (si hay algo sin commitear)
 2. Creá y switcheá al branch '${branch_name}' (si no existe)
 3. Pusheá a origin con: git push -u origin ${branch_name}
 4. Creá un Pull Request con gh pr create --base main --head ${branch_name} --title 'S${session_num}: ${_current_session_name}' --body 'Sesión ${session_num} del roadmap - ${_current_session_name}'
-Si el branch ya existe, usá el existente. Si gh CLI no está disponible, solo pusheá."
+Si el branch ya existe, usá el existente. Si gh CLI no está disponible, solo pusheá.
+IMPORTANTE: Aunque no haya cambios nuevos para commitear, SIEMPRE ejecutá git push."
       elif [ "$ORCH_BRANCH_STRATEGY" = "roadmap-branch" ]; then
         local branch_name="roadmap/${slug}"
         echo -e "  ${BOLD}▸ Push (roadmap branch)${RESET}"
-        push_prompt="Build, lint y tests pasaron. Hacé lo siguiente en orden:
-1. Commiteá todos los cambios pendientes (si los hay)
+        push_prompt="Modo batch — no pidas confirmación. Hacé lo siguiente en orden:
+1. Commiteá todos los cambios pendientes con git add y git commit (si hay algo sin commitear)
 2. Si no estás en el branch '${branch_name}', switcheá a él (crealo si no existe con: git checkout -b ${branch_name})
 3. Pusheá a origin con: git push -u origin ${branch_name}
-NO crees Pull Request — se crea al final del roadmap completo."
+NO crees Pull Request — se crea al final del roadmap completo.
+IMPORTANTE: Aunque no haya cambios nuevos para commitear, SIEMPRE ejecutá git push."
       else
         echo -e "  ${BOLD}▸ Push${RESET}"
-        push_prompt="Build, lint y tests pasaron. Commiteá los cambios pendientes (si los hay) y pusheá a origin."
+        push_prompt="Modo batch — no pidas confirmación. Hacé lo siguiente en orden:
+1. Corré 'git status' para ver si hay cambios sin commitear
+2. Si hay cambios: git add . && git commit -m 'chore: pending changes'
+3. SIEMPRE ejecutá: git push -u origin HEAD
+Aunque git status diga 'nothing to commit', SIEMPRE ejecutá git push para subir commits anteriores que no se hayan pusheado."
       fi
 
       # Push with retries for network failures
       local push_attempt=0
+      local push_ok=false
       while [ $push_attempt -lt "$ORCH_PUSH_RETRIES" ]; do
         push_attempt=$((push_attempt + 1))
-        run_claude "$project_path" "$push_prompt" "$model" "$ORCH_MAX_TURNS_BUILD" \
-          "${log_dir}/${timestamp}-s${session_num}-push-${push_attempt}.log" && break
+        if run_claude "$project_path" "$push_prompt" "$model" "$ORCH_MAX_TURNS_BUILD" \
+          "${log_dir}/${timestamp}-s${session_num}-push-${push_attempt}.log"; then
+          push_ok=true
+          break
+        fi
 
         if [ $push_attempt -lt "$ORCH_PUSH_RETRIES" ]; then
           local wait_time=$(( ORCH_PUSH_BACKOFF_BASE ** push_attempt ))
@@ -172,6 +205,18 @@ NO crees Pull Request — se crea al final del roadmap completo."
           sleep "$wait_time"
         fi
       done
+
+      # Fallback: if Claude didn't push, try direct git push
+      if [ "$push_ok" = false ] || [ "$has_unpushed" = true ]; then
+        local still_unpushed=0
+        still_unpushed=$(cd "$project_path" && git log --oneline "@{upstream}..HEAD" 2>/dev/null | wc -l | tr -d ' ') || still_unpushed=0
+        if [ "$still_unpushed" -gt 0 ]; then
+          echo -e "  ${YELLOW}▸ Fallback: push directo (${still_unpushed} commits sin pushear)${RESET}"
+          (cd "$project_path" && git push -u origin HEAD 2>&1) || {
+            ui_warn "Fallback push falló — verificá manualmente"
+          }
+        fi
+      fi
 
       # Post-push: handle branch switching
       if [ "$ORCH_BRANCH_STRATEGY" = "pr" ]; then

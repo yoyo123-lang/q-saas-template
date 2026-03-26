@@ -1,9 +1,21 @@
 #!/usr/bin/env bash
 # ── Claude CLI runner for q-orchestrator ──
 # All settings come from lib/config.sh (ORCH_* variables)
+# MUST be sourced AFTER config.sh — depends on ORCH_* variables being set.
 
 # ── Stream filter script path ──
 _STREAM_FILTER="${BASH_SOURCE[0]%/*}/stream-filter.js"
+
+# ── Sanitize a string for safe interpolation in prompts/commands ──
+# Removes characters that could break quoting or cause injection
+_sanitize_for_prompt() {
+  local str="$1"
+  str="${str//\`/}"
+  str="${str//\$/}"
+  str="${str//\'/}"
+  str="${str//\"/}"
+  printf '%s' "$str"
+}
 
 # ── Build claude command array in caller's scope ──
 # Sets: _CLAUDE_CMD array (must be declared by caller or used after call)
@@ -49,10 +61,20 @@ run_claude() {
     filter_args=(--log "$log_file")
   fi
 
-  if [ "$ORCH_VERBOSE" = "true" ] && [ -f "$_STREAM_FILTER" ] && command -v node &>/dev/null; then
+  if [ "${ORCH_VERBOSE:-false}" = "true" ] && [ -f "$_STREAM_FILTER" ] && command -v node &>/dev/null; then
     # Stream JSON through filter for real-time readable output
-    (cd "$project_path" && "${_CLAUDE_CMD[@]}" 2>&1 | node "$_STREAM_FILTER" "${filter_args[@]}") || exit_code=$?
-  elif [ -n "$log_file" ] && [ "$ORCH_SAVE_LOGS" = "true" ]; then
+    # CRITICO-1 fix: if stream-filter crashes or doesn't exist, fall back to tee/raw
+    # to avoid losing Claude's output through a broken pipe
+    if node -e "try{require('${_STREAM_FILTER}')}catch(e){process.exit(1)}" &>/dev/null 2>&1; then
+      (cd "$project_path" && "${_CLAUDE_CMD[@]}" 2>&1 | node "$_STREAM_FILTER" "${filter_args[@]}") || exit_code=$?
+    elif [ -n "$log_file" ] && [ "${ORCH_SAVE_LOGS:-false}" = "true" ]; then
+      ui_warn "stream-filter.js no se pudo cargar — usando tee como fallback"
+      (cd "$project_path" && "${_CLAUDE_CMD[@]}" 2>&1 | tee "$log_file") || exit_code=$?
+    else
+      ui_warn "stream-filter.js no se pudo cargar — sin filtro"
+      (cd "$project_path" && "${_CLAUDE_CMD[@]}" 2>&1) || exit_code=$?
+    fi
+  elif [ -n "$log_file" ] && [ "${ORCH_SAVE_LOGS:-false}" = "true" ]; then
     (cd "$project_path" && "${_CLAUDE_CMD[@]}" 2>&1 | tee "$log_file") || exit_code=$?
   else
     (cd "$project_path" && "${_CLAUDE_CMD[@]}" 2>&1) || exit_code=$?
@@ -94,11 +116,18 @@ _handle_step_fail() {
       return 1
       ;;
     ask|*)
-      ui_warn "Paso '${step_name}' falló."
-      if ui_confirm "¿Continuar con el siguiente paso?"; then
-        return 0
+      # ALTO-3 fix: in batch/cron mode stdin is not available,
+      # so ui_confirm would always fail → treat as skip instead of abort
+      if [ -t 0 ]; then
+        ui_warn "Paso '${step_name}' falló."
+        if ui_confirm "¿Continuar con el siguiente paso?"; then
+          return 0
+        else
+          return 1
+        fi
       else
-        return 1
+        ui_warn "Paso '${step_name}' falló — saltando (modo batch, stdin no disponible)"
+        return 0
       fi
       ;;
   esac
@@ -113,7 +142,9 @@ run_ci_check_and_fix() {
   local log_dir="$4"
   local timestamp="$5"
   local session_num="$6"
-  local _current_session_name="${7:-Sesión ${session_num}}"
+  # CRITICO-3 fix: sanitize session name to prevent injection via ROADMAP.md
+  local _current_session_name
+  _current_session_name=$(_sanitize_for_prompt "${7:-Sesión ${session_num}}")
 
   local attempt=0
 
@@ -194,7 +225,8 @@ Aunque git status diga 'nothing to commit', SIEMPRE ejecutá git push para subir
         fi
 
         if [ $push_attempt -lt "$ORCH_PUSH_RETRIES" ]; then
-          local wait_time=$(( ORCH_PUSH_BACKOFF_BASE ** push_attempt ))
+          # ALTO-4 fix: use multiplication instead of ** (safer with non-integer values)
+          local wait_time=$(( ${ORCH_PUSH_BACKOFF_BASE:-2} * push_attempt ))
           ui_warn "Push falló — reintentando en ${wait_time}s..."
           sleep "$wait_time"
         fi
@@ -214,6 +246,16 @@ Aunque git status diga 'nothing to commit', SIEMPRE ejecutá git push para subir
       else
         if ! echo "$fallback_output" | grep -qi "up-to-date\|up to date"; then
           echo -e "  ${CYAN}▸ Fallback push ejecutado correctamente${RESET}"
+        fi
+      fi
+
+      # ALTO-1 fix: verify push actually succeeded before marking as completed
+      # If both Claude push and fallback failed, don't mark session as completed
+      if [ "$push_ok" = false ] && [ $fallback_result -ne 0 ]; then
+        if ! echo "$fallback_output" | grep -qi "up-to-date\|up to date"; then
+          ui_error "Push falló después de ${ORCH_PUSH_RETRIES} reintentos y fallback directo"
+          ui_error "Los commits están en local pero NO en el remote. Verificá manualmente."
+          return 1
         fi
       fi
 
@@ -310,9 +352,10 @@ run_session_cambio_grande() {
   # Find session prompt file (try multiple naming conventions)
   local session_file=""
   if [ -n "$sessions_dir" ]; then
+    # MEDIO-1 fix: separate path from printf format to avoid format string injection
     local candidates=(
-      "$(printf "${sessions_dir}/sesion-%02d.md" "$session_num")"
-      "$(printf "${sessions_dir}/session-%02d.md" "$session_num")"
+      "${sessions_dir}/$(printf 'sesion-%02d.md' "$session_num")"
+      "${sessions_dir}/$(printf 'session-%02d.md' "$session_num")"
       "${sessions_dir}/sesion-${session_num}.md"
       "${sessions_dir}/session-${session_num}.md"
     )
@@ -322,6 +365,11 @@ run_session_cambio_grande() {
         break
       fi
     done
+  fi
+
+  # MEDIO-3 fix: log when no session file found so users know fallback is active
+  if [ -z "$session_file" ]; then
+    ui_info "No se encontró archivo de sesión para S${session_num} — usando ROADMAP.md como plan"
   fi
 
   telemetry_step_start "implement" "$ORCH_MAX_TURNS_IMPLEMENT"
@@ -423,9 +471,10 @@ Reglas:
       # Escalated fix: one pass per severity level
       for sev in "${severity_levels[@]}"; do
         echo -e "    ${CYAN}↳ Corrigiendo hallazgos ${sev}${RESET}"
-        save_state "$slug" "$session_num" "fix-${sev,,}" "running"
-
-        local sev_lower="${sev,,}"
+        # ALTO-2 fix: ${sev,,} requires Bash 4+ (macOS ships Bash 3.2)
+        local sev_lower
+        sev_lower=$(printf '%s' "$sev" | tr '[:upper:]' '[:lower:]')
+        save_state "$slug" "$session_num" "fix-${sev_lower}" "running"
         local fix_prompt="Leé los informes de revisión en docs/reviews/ (si existen). Corregí SOLO los hallazgos ${sev} que aún no estén resueltos. Commiteá cada corrección. Si no quedan hallazgos ${sev} pendientes, respondé 'No hay hallazgos ${sev} pendientes' y terminá."
         step_exit=0
         run_claude "$project_path" "$fix_prompt" "$model" "$fix_turns" \

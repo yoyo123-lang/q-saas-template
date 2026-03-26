@@ -13,6 +13,20 @@
 #
 set -euo pipefail
 
+# ── Crash handler: log exact line + command on any unhandled error ──
+# Without this, set -e kills the script silently and you get no diagnostics.
+trap '_orch_crash_handler $LINENO "$BASH_COMMAND" $?' ERR
+_orch_crash_handler() {
+  local line="$1" cmd="$2" code="$3"
+  echo "" >&2
+  echo "  [CRASH] q-orchestrator terminó inesperadamente" >&2
+  echo "  [CRASH] Línea: ${line}" >&2
+  echo "  [CRASH] Comando: ${cmd}" >&2
+  echo "  [CRASH] Exit code: ${code}" >&2
+  echo "  [CRASH] Reportá esto para diagnóstico." >&2
+  echo "" >&2
+}
+
 # ── Resolve script location ──
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 

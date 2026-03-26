@@ -156,7 +156,7 @@ run_ci_check_and_fix() {
     echo -e "  ${BOLD}▸ CI Check (intento ${attempt}/${ORCH_CI_MAX_RETRIES})${RESET}"
 
     # Run build + lint + test locally first
-    save_state "$slug" "$session_num" "ci-check-${attempt}" "running"
+    save_state "$slug" "$session_num" "ci-check-${attempt}" "running" || true
 
     # CI prompt instructs Claude to exit with non-zero if any check fails.
     # This ensures the orchestrator can distinguish pass from fail —
@@ -182,7 +182,7 @@ NO pushees todavía. Solo corré los checks y reportá."
     # - Fallback: if Claude exited 0 but didn't run the final bash command,
     #   we still proceed to push (better to push than to lose work)
     if [ $ci_exit -eq 0 ]; then
-      telemetry_ci_attempt "$attempt" "$ORCH_CI_MAX_RETRIES" "pass"
+      telemetry_ci_attempt "$attempt" "$ORCH_CI_MAX_RETRIES" "pass" || true
 
       # Determine push strategy and prompt
       local push_prompt=""
@@ -274,12 +274,12 @@ Aunque git status diga 'nothing to commit', SIEMPRE ejecutá git push para subir
     fi
 
     # CI failed — try to fix
-    telemetry_ci_attempt "$attempt" "$ORCH_CI_MAX_RETRIES" "fail"
+    telemetry_ci_attempt "$attempt" "$ORCH_CI_MAX_RETRIES" "fail" || true
 
     if [ $attempt -lt "$ORCH_CI_MAX_RETRIES" ]; then
       echo -e "  ${YELLOW}▸ CI falló — reparando (intento ${attempt}/${ORCH_CI_MAX_RETRIES})${RESET}"
-      save_state "$slug" "$session_num" "ci-fix-${attempt}" "running"
-      telemetry_ci_attempt "$attempt" "$ORCH_CI_MAX_RETRIES" "fix_attempted"
+      save_state "$slug" "$session_num" "ci-fix-${attempt}" "running" || true
+      telemetry_ci_attempt "$attempt" "$ORCH_CI_MAX_RETRIES" "fix_attempted" || true
 
       local fix_prompt="Modo batch — no pidas confirmación. Build, lint o tests fallaron. Leé los errores del último intento, corregí los problemas, y commiteá las correcciones. NO pushees."
       run_claude "$project_path" "$fix_prompt" "$model" "$ORCH_MAX_TURNS_CI_FIX" \
@@ -348,7 +348,7 @@ run_session_cambio_grande() {
   # ── Step: Implement ──
   current_step=$((current_step + 1))
   echo -e "  ${BOLD}▸ Paso ${current_step}/${total_steps}: Implementación${RESET}"
-  save_state "$slug" "$session_num" "implement" "running"
+  save_state "$slug" "$session_num" "implement" "running" || true
 
   # Find session prompt file (try multiple naming conventions)
   local session_file=""
@@ -373,7 +373,7 @@ run_session_cambio_grande() {
     ui_info "No se encontró archivo de sesión para S${session_num} — usando ROADMAP.md como plan"
   fi
 
-  telemetry_step_start "implement" "$ORCH_MAX_TURNS_IMPLEMENT"
+  telemetry_step_start "implement" "$ORCH_MAX_TURNS_IMPLEMENT" || true
   local step_exit=0
   if [ -n "$session_file" ]; then
     echo -e "    ${DIM:-}(usando plan: ${session_file##*/})${RESET:-}"
@@ -412,22 +412,22 @@ Reglas:
   fi
 
   if [ $step_exit -ne 0 ]; then
-    telemetry_step_end "implement" "$step_exit" "failed"
+    telemetry_step_end "implement" "$step_exit" "failed" || true
     _handle_step_fail "implementación" || {
-      save_state "$slug" "$session_num" "implement" "failed"
-      telemetry_end_run "failed"
+      save_state "$slug" "$session_num" "implement" "failed" || true
+      telemetry_end_run "failed" || true
       return 1
     }
   else
-    telemetry_step_end "implement" "0" "success"
+    telemetry_step_end "implement" "0" "success" || true
   fi
 
   # ── Step: Role review ──
   if [ "$ORCH_SKIP_ROLES" != "true" ]; then
     current_step=$((current_step + 1))
     echo -e "  ${BOLD}▸ Paso ${current_step}/${total_steps}: Revisión por roles${RESET}"
-    save_state "$slug" "$session_num" "roles" "running"
-    telemetry_step_start "roles" "$ORCH_MAX_TURNS_SUPPORT"
+    save_state "$slug" "$session_num" "roles" "running" || true
+    telemetry_step_start "roles" "$ORCH_MAX_TURNS_SUPPORT" || true
 
     step_exit=0
     if [ -n "$prompts_dir" ] && [ -f "${prompts_dir}/apply-roles.md" ]; then
@@ -440,14 +440,14 @@ Reglas:
     fi
 
     if [ $step_exit -ne 0 ]; then
-      telemetry_step_end "roles" "$step_exit" "failed"
+      telemetry_step_end "roles" "$step_exit" "failed" || true
       _handle_step_fail "revisión por roles" || {
-        save_state "$slug" "$session_num" "roles" "failed"
-        telemetry_end_run "failed"
+        save_state "$slug" "$session_num" "roles" "failed" || true
+        telemetry_end_run "failed" || true
         return 1
       }
     else
-      telemetry_step_end "roles" "0" "success"
+      telemetry_step_end "roles" "0" "success" || true
     fi
   fi
 
@@ -455,8 +455,8 @@ Reglas:
   if [ "$ORCH_SKIP_FIX" != "true" ]; then
     current_step=$((current_step + 1))
     echo -e "  ${BOLD}▸ Paso ${current_step}/${total_steps}: Corrección de hallazgos${RESET}"
-    save_state "$slug" "$session_num" "fix" "running"
-    telemetry_step_start "fix" "$ORCH_MAX_TURNS_FIX_PASS"
+    save_state "$slug" "$session_num" "fix" "running" || true
+    telemetry_step_start "fix" "$ORCH_MAX_TURNS_FIX_PASS" || true
 
     local fix_turns="${ORCH_MAX_TURNS_FIX_PASS}"
     local severity_levels=("CRÍTICOS" "ALTOS" "MEDIOS")
@@ -475,7 +475,7 @@ Reglas:
         # ALTO-2 fix: ${sev,,} requires Bash 4+ (macOS ships Bash 3.2)
         local sev_lower
         sev_lower=$(printf '%s' "$sev" | tr '[:upper:]' '[:lower:]')
-        save_state "$slug" "$session_num" "fix-${sev_lower}" "running"
+        save_state "$slug" "$session_num" "fix-${sev_lower}" "running" || true
         local fix_prompt="Leé los informes de revisión en docs/reviews/ (si existen). Corregí SOLO los hallazgos ${sev} que aún no estén resueltos. Commiteá cada corrección. Si no quedan hallazgos ${sev} pendientes, respondé 'No hay hallazgos ${sev} pendientes' y terminá."
         step_exit=0
         run_claude "$project_path" "$fix_prompt" "$model" "$fix_turns" \
@@ -496,9 +496,9 @@ Reglas:
       "${log_dir}/${timestamp}-s${session_num}-fix-debt.log" || true
 
     if [ "$severity_all_ok" = true ]; then
-      telemetry_step_end "fix" "0" "success"
+      telemetry_step_end "fix" "0" "success" || true
     else
-      telemetry_step_end "fix" "1" "partial"
+      telemetry_step_end "fix" "1" "partial" || true
       # Don't fail the session — debt was logged
       ui_warn "Algunos hallazgos no se corrigieron — registrados en docs/TECH_DEBT.md"
     fi
@@ -508,8 +508,8 @@ Reglas:
   if [ "$ORCH_SKIP_DOCS" != "true" ]; then
     current_step=$((current_step + 1))
     echo -e "  ${BOLD}▸ Paso ${current_step}/${total_steps}: Documentación${RESET}"
-    save_state "$slug" "$session_num" "document" "running"
-    telemetry_step_start "document" "$ORCH_MAX_TURNS_SUPPORT"
+    save_state "$slug" "$session_num" "document" "running" || true
+    telemetry_step_start "document" "$ORCH_MAX_TURNS_SUPPORT" || true
 
     step_exit=0
     if [ -n "$prompts_dir" ] && [ -f "${prompts_dir}/document.md" ]; then
@@ -522,34 +522,34 @@ Reglas:
     fi
 
     if [ $step_exit -ne 0 ]; then
-      telemetry_step_end "document" "$step_exit" "failed"
+      telemetry_step_end "document" "$step_exit" "failed" || true
       _handle_step_fail "documentación" || {
-        save_state "$slug" "$session_num" "document" "failed"
-        telemetry_end_run "failed"
+        save_state "$slug" "$session_num" "document" "failed" || true
+        telemetry_end_run "failed" || true
         return 1
       }
     else
-      telemetry_step_end "document" "0" "success"
+      telemetry_step_end "document" "0" "success" || true
     fi
   fi
 
   # ── Step: Build + Push (with CI retry loop) ──
   current_step=$((current_step + 1))
   echo -e "  ${BOLD}▸ Paso ${current_step}/${total_steps}: Build + Push${RESET}"
-  save_state "$slug" "$session_num" "build-push" "running"
-  telemetry_step_start "build_push" "$ORCH_MAX_TURNS_BUILD"
+  save_state "$slug" "$session_num" "build-push" "running" || true
+  telemetry_step_start "build_push" "$ORCH_MAX_TURNS_BUILD" || true
 
   if run_ci_check_and_fix "$project_path" "$model" "$slug" "$log_dir" "$timestamp" "$session_num" "$session_name"; then
-    telemetry_step_end "build_push" "0" "success"
-    save_state "$slug" "$session_num" "completed" "completed"
+    telemetry_step_end "build_push" "0" "success" || true
+    save_state "$slug" "$session_num" "completed" "completed" || true
     mark_session_completed "$slug" "$session_num"
-    telemetry_end_run "completed"
+    telemetry_end_run "completed" || true
     echo ""
     echo -e "  ${GREEN}✓ Sesión ${session_num} completada${RESET}"
   else
-    telemetry_step_end "build_push" "1" "failed"
-    save_state "$slug" "$session_num" "build-push" "failed"
-    telemetry_end_run "failed"
+    telemetry_step_end "build_push" "1" "failed" || true
+    save_state "$slug" "$session_num" "build-push" "failed" || true
+    telemetry_end_run "failed" || true
     echo ""
     echo -e "  ${RED}✗ Sesión ${session_num} falló en build/push${RESET}"
     return 1

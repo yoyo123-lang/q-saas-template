@@ -45,6 +45,12 @@ _build_claude_cmd() {
 
 # ── Run claude in prompt mode ──
 # Returns: exit code of claude process
+#
+# IMPORTANT: Uses pushd/popd instead of subshell (cd ...) to avoid a known
+# issue on Windows/Git Bash (MSYS) where the subshell process group waits
+# for ALL descendant processes — including orphaned children like Jest with
+# --detectOpenHandles. This caused the orchestrator to hang after CI checks
+# completed, preventing return to the main menu.
 run_claude() {
   local project_path="$1"
   local prompt="$2"
@@ -61,25 +67,33 @@ run_claude() {
     filter_args=(--log "$log_file")
   fi
 
+  # Change to project directory (restored via popd at the end)
+  pushd "$project_path" > /dev/null 2>&1 || {
+    ui_error "No se pudo acceder a: $project_path"
+    return 1
+  }
+
   if [ "${ORCH_VERBOSE:-false}" = "true" ] && [ -f "$_STREAM_FILTER" ] && command -v node &>/dev/null; then
     # Stream JSON through filter for real-time readable output
     # CRITICO-1 fix: if stream-filter has syntax errors, fall back to tee/raw
     # Use --check (syntax-only) instead of require() to avoid Windows path issues
     # (embedded paths in JS strings don't get Git Bash → Windows path translation)
     if node --check "$_STREAM_FILTER" &>/dev/null 2>&1; then
-      (cd "$project_path" && "${_CLAUDE_CMD[@]}" 2>&1 | node "$_STREAM_FILTER" "${filter_args[@]}") || exit_code=$?
+      "${_CLAUDE_CMD[@]}" 2>&1 | node "$_STREAM_FILTER" "${filter_args[@]}" || exit_code=$?
     elif [ -n "$log_file" ] && [ "${ORCH_SAVE_LOGS:-false}" = "true" ]; then
       ui_warn "stream-filter.js no se pudo cargar — usando tee como fallback"
-      (cd "$project_path" && "${_CLAUDE_CMD[@]}" 2>&1 | tee "$log_file") || exit_code=$?
+      "${_CLAUDE_CMD[@]}" 2>&1 | tee "$log_file" || exit_code=$?
     else
       ui_warn "stream-filter.js no se pudo cargar — sin filtro"
-      (cd "$project_path" && "${_CLAUDE_CMD[@]}" 2>&1) || exit_code=$?
+      "${_CLAUDE_CMD[@]}" 2>&1 || exit_code=$?
     fi
   elif [ -n "$log_file" ] && [ "${ORCH_SAVE_LOGS:-false}" = "true" ]; then
-    (cd "$project_path" && "${_CLAUDE_CMD[@]}" 2>&1 | tee "$log_file") || exit_code=$?
+    "${_CLAUDE_CMD[@]}" 2>&1 | tee "$log_file" || exit_code=$?
   else
-    (cd "$project_path" && "${_CLAUDE_CMD[@]}" 2>&1) || exit_code=$?
+    "${_CLAUDE_CMD[@]}" 2>&1 || exit_code=$?
   fi
+
+  popd > /dev/null 2>&1 || true
 
   return $exit_code
 }
@@ -174,13 +188,19 @@ Esto determina si el orquestador continúa con el push o intenta reparar. Es CR�
 
 NO pushees todavía. Solo corré los checks y reportá."
     local ci_exit=0
+    local ci_log_file="${log_dir}/${timestamp}-s${session_num}-ci-check-${attempt}.log"
     run_claude "$project_path" "$ci_prompt" "$model" "$ORCH_MAX_TURNS_BUILD" \
-      "${log_dir}/${timestamp}-s${session_num}-ci-check-${attempt}.log" || ci_exit=$?
+      "$ci_log_file" || ci_exit=$?
 
     # Check if CI passed:
-    # - Primary: Claude CLI exit code (now reliable with explicit exit 0/1)
-    # - Fallback: if Claude exited 0 but didn't run the final bash command,
-    #   we still proceed to push (better to push than to lose work)
+    # - Primary: scan log for CI_RESULT marker (most reliable — Claude CLI
+    #   always exits 0 regardless of internal bash tool exit codes)
+    # - Fallback: if no marker found and CLI exited 0, assume pass
+    #   (better to push than to lose work)
+    if [ -f "$ci_log_file" ] && grep -q "CI_RESULT=FAIL" "$ci_log_file" 2>/dev/null; then
+      ci_exit=1
+    fi
+
     if [ $ci_exit -eq 0 ]; then
       telemetry_ci_attempt "$attempt" "$ORCH_CI_MAX_RETRIES" "pass"
 
@@ -235,10 +255,12 @@ Aunque git status diga 'nothing to commit', SIEMPRE ejecutá git push para subir
 
       # Fallback: always try direct git push as safety net
       # This catches cases where Claude didn't actually push, or where
-      # there was no upstream tracking branch configured
+      # there was no upstream tracking branch configured.
+      # Use GIT_TERMINAL_PROMPT=0 to prevent hanging on credential prompts
+      # in non-interactive contexts (batch mode).
       local fallback_result=0
       local fallback_output=""
-      fallback_output=$(cd "$project_path" && git push -u origin HEAD 2>&1) || fallback_result=$?
+      fallback_output=$(cd "$project_path" && GIT_TERMINAL_PROMPT=0 git push -u origin HEAD 2>&1) || fallback_result=$?
       if [ $fallback_result -ne 0 ]; then
         # Only warn if it's not "everything up-to-date"
         if ! echo "$fallback_output" | grep -qi "up-to-date\|up to date"; then

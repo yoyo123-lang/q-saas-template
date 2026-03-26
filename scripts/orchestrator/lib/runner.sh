@@ -63,9 +63,10 @@ run_claude() {
 
   if [ "${ORCH_VERBOSE:-false}" = "true" ] && [ -f "$_STREAM_FILTER" ] && command -v node &>/dev/null; then
     # Stream JSON through filter for real-time readable output
-    # CRITICO-1 fix: if stream-filter crashes or doesn't exist, fall back to tee/raw
-    # to avoid losing Claude's output through a broken pipe
-    if node -e "try{require('${_STREAM_FILTER}')}catch(e){process.exit(1)}" &>/dev/null 2>&1; then
+    # CRITICO-1 fix: if stream-filter has syntax errors, fall back to tee/raw
+    # Use --check (syntax-only) instead of require() to avoid Windows path issues
+    # (embedded paths in JS strings don't get Git Bash → Windows path translation)
+    if node --check "$_STREAM_FILTER" &>/dev/null 2>&1; then
       (cd "$project_path" && "${_CLAUDE_CMD[@]}" 2>&1 | node "$_STREAM_FILTER" "${filter_args[@]}") || exit_code=$?
     elif [ -n "$log_file" ] && [ "${ORCH_SAVE_LOGS:-false}" = "true" ]; then
       ui_warn "stream-filter.js no se pudo cargar — usando tee como fallback"

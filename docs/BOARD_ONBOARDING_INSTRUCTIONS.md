@@ -4,6 +4,17 @@
 > **Objetivo**: conectar esta BU al Board central de Q Company para recibir docs sincronizados, enviar métricas y recibir directivas
 > **Prerrequisito**: que el onboarding de docs ya se haya hecho en el repo de q-company (los archivos BUSINESS_MODEL.md, METRICS_MAP.md y BOARD_CONTEXT.md ya existen en `docs/bu/{slug}/`)
 
+## Orden de lectura recomendado
+
+Antes de empezar la implementación técnica, leer en este orden:
+
+1. `docs/board/BOARD_CONTEXT.md` — Qué es el Board, cómo funciona la conexión
+2. `docs/board/BUSINESS_MODEL.md` — El modelo de negocio de esta BU (fuente de verdad)
+3. `docs/board/METRICS_MAP.md` — Qué métricas enviar y a qué roles AI del Board alimentan
+4. Este documento — Implementación técnica paso a paso
+
+> Si los archivos del Board todavía no llegaron (la carpeta `docs/board/` está vacía), significa que el sync desde q-company no corrió todavía. Pedile al admin del Board que lo ejecute.
+
 ---
 
 ## Contexto
@@ -52,6 +63,17 @@ touch docs/board/.gitkeep
 ## TAREA 2: Configurar variables de entorno
 
 Pedirle al usuario las credenciales del Board y agregarlas al `.env`:
+
+### Cómo obtener las credenciales
+
+Las credenciales se generan automáticamente cuando el admin del Board registra esta BU en el dashboard de Q Company (`/dashboard` → crear nueva BU). El admin va a recibir:
+
+- **BOARD_API_KEY**: se muestra UNA SOLA VEZ al crear la BU (formato: `qb_{slug}_{key}`). Si se pierde, hay que regenerarla.
+- **BOARD_BU_ID**: el ID de la BU en el Board (visible en la URL del dashboard: `/dashboard/bu/{id}`)
+- **BOARD_WEBHOOK_SECRET**: se genera automáticamente (formato: `whsec_{secret}`). Se puede regenerar desde el dashboard.
+- **BOARD_URL**: siempre es `https://q-company.vercel.app` en producción.
+
+> Si no tenés las credenciales, contactá al admin del Board antes de avanzar con la implementación técnica.
 
 ```env
 BOARD_API_KEY=qb_{slug}_{key}       # API key de la BU (la provee el admin del Board)
@@ -163,6 +185,7 @@ Si responde `201` con `{ success: true }`, la conexión está OK.
 - [ ] Variables agregadas al `.env.example`
 - [ ] Board client revisado (`src/lib/board-client.ts`)
 - [ ] Métricas personalizadas para esta BU
+- [ ] Métricas actualizadas en `src/lib/board-metrics.ts` (fuente única de verdad)
 - [ ] Heartbeat cron configurado (cada 5 minutos)
 - [ ] Metrics cron configurado (semanal + mensual si aplica)
 - [ ] Endpoint `/api/v1/directives/receive` funcionando con validación HMAC

@@ -122,3 +122,76 @@ Cuando enfrentes un problema complejo, usá "ultrathink" para activar razonamien
 - Decisiones que afecten la arquitectura
 - Debugging de problemas difíciles de reproducir
 - Cualquier cambio que toque más de 5 archivos
+
+## Conexión con Q Company Board
+
+Esta BU pertenece al grupo Q Company y reporta al Board central.
+Ver `docs/board/BOARD_CONTEXT.md` para entender la conexión.
+
+**Archivos clave:**
+- `src/lib/board-client.ts` — `sendHeartbeat`, `sendMetrics`, `sendEvents`, `updateDirectiveStatus`
+- `src/app/api/cron/board-heartbeat/route.ts` — cron Vercel que corre cada 5 min
+- `src/app/api/cron/board-metrics/route.ts` — cron semanal (lunes 8am UTC)
+- `src/app/api/v1/directives/receive/route.ts` — receptor de directivas con HMAC
+
+**Variables de entorno requeridas:** `BOARD_URL`, `BOARD_API_KEY`, `BOARD_BU_ID`, `BOARD_WEBHOOK_SECRET`, `CRON_SECRET`
+
+**Docs sincronizados del Board** (llegan via PR automático del repo `q-company`):
+- `docs/board/BUSINESS_MODEL.md`
+- `docs/board/METRICS_MAP.md`
+- `docs/board/BOARD_CONTEXT.md`
+
+Estos archivos se editan en el repo de q-company, NO acá. Los cambios llegan via PR automático.
+
+**Regla:** los eventos son fire-and-forget — nunca hacer `await sendEvents(...)` en el flujo principal. Usar `.catch()` para loguear errores sin afectar la respuesta.
+
+## Directivas del Board (Q Company)
+
+Cuando te pidan implementar una directiva del Board (issue con label `q-directive` y `verified`), seguí estos pasos:
+
+### Paso 1: Entender la directiva
+
+Leé la sección **"Instrucciones"** del issue — ahí está el cambio solicitado. Antes de escribir código, asegurate de entender:
+
+- Qué archivos hay que tocar
+- Qué comportamiento nuevo se espera
+- Qué restricciones tiene la directiva (deadline, prioridad)
+
+Si la directiva no es clara o es ambigua, **no asumas**: comentá en el issue pidiendo clarificación antes de empezar.
+
+### Paso 2: Implementar
+
+1. Analizá el código actual del proyecto para entender los patrones existentes
+2. Implementá los cambios siguiendo las convenciones del proyecto (CLAUDE.md, estructura de carpetas, estilo de código)
+3. No toques archivos que no estén relacionados con la directiva
+4. Cada directiva se resuelve en un solo PR
+
+### Paso 3: Verificar
+
+Antes de crear el PR, corré:
+
+- Tests: el comando de tests del proyecto
+- Build: el comando de build del proyecto
+- Lint si aplica
+
+Si los tests o el build fallan después de implementar los cambios, intentá arreglarlos. Si no podés resolverlo, explicá el problema en el body del PR para que un humano lo revise.
+
+### Paso 4: Crear el PR
+
+Creá un Pull Request con:
+
+- **Título**: `directive: {título de la directiva}`
+- **Body**: explicación clara de qué se cambió y por qué, qué tests se corrieron, y cualquier decisión técnica relevante
+- **Referencia al issue**: incluir `Closes #XX` en el body del PR
+
+### Reglas para directivas
+
+- **NO pushear directo a main** — siempre crear PR, aunque los cambios sean mínimos
+- Si la directiva no es clara, comentar en el issue pidiendo clarificación, y no implementar hasta tener respuesta
+- Si tests o build fallan y no se pueden arreglar, crear el PR igual con una nota explicando el problema — no dejar la directiva sin respuesta
+- No hacer refactors no relacionados con la directiva en el mismo PR
+- El PR debe poder revisarse e integrarse de forma independiente
+
+### Si el issue es un PING de conectividad
+
+Si la directiva dice "Esta es una directiva de prueba" o similar, no hacer cambios en el código. Simplemente responder con una nota en el PR o en el issue: "PING OK — receptor funcionando correctamente".

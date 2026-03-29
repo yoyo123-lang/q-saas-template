@@ -1,5 +1,9 @@
 {
   "framework": "nextjs",
+  "crons": [
+    { "path": "/api/cron/board-heartbeat", "schedule": "*/5 * * * *" },
+    { "path": "/api/cron/board-metrics", "schedule": "0 8 * * 1" }
+  ],
   "headers": [
     {
       "source": "/(.*)",

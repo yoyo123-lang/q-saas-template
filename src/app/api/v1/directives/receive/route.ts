@@ -17,8 +17,8 @@
 
 import { createHmac, timingSafeEqual } from "crypto";
 import { NextRequest, after } from "next/server";
-import { sendMetrics, updateDirectiveStatus } from "@/lib/board-client";
-import { prisma } from "@/lib/db";
+import { updateDirectiveStatus } from "@/lib/board-client";
+import { collectAndSendMetrics } from "@/lib/board-metrics";
 
 // ---------------------------------------------------------------------------
 // HMAC validation
@@ -101,47 +101,6 @@ export async function POST(request: NextRequest) {
   );
 
   return Response.json({ acknowledged: true, directive_id });
-}
-
-// ---------------------------------------------------------------------------
-// Metrics collection (invoked on METRICS_REQUEST directive)
-// ---------------------------------------------------------------------------
-
-/**
- * Recolecta y envía métricas al Board cuando se recibe una directiva METRICS_REQUEST.
- *
- * TODO: Personalizar con las métricas reales de esta BU.
- * Usa try-catch por métrica individual para permitir partial failures.
- */
-async function collectAndSendMetrics(): Promise<void> {
-  const period = new Date().toISOString().slice(0, 10);
-  const metrics: Array<{ key: string; value: number; period: string }> = [];
-
-  try {
-    const activeUsers = await prisma.user.count({
-      where: { role: { not: "INACTIVE" } },
-    });
-    metrics.push({ key: "active_users", value: activeUsers, period });
-  } catch (err) {
-    console.error("[Board] Error calculando active_users:", err);
-  }
-
-  try {
-    const totalProjects = await prisma.project.count();
-    metrics.push({ key: "total_projects", value: totalProjects, period });
-  } catch (err) {
-    console.error("[Board] Error calculando total_projects:", err);
-  }
-
-  // TODO: Agregar métricas específicas de esta BU
-
-  if (metrics.length > 0) {
-    await sendMetrics(metrics);
-    console.log("[Board] Métricas enviadas vía METRICS_REQUEST", {
-      period,
-      count: metrics.length,
-    });
-  }
 }
 
 // ---------------------------------------------------------------------------

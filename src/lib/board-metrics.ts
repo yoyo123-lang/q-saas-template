@@ -25,11 +25,9 @@ import type { BoardMetric } from "@/lib/board-client";
 export async function collectMetrics(period: string): Promise<BoardMetric[]> {
   const metrics: BoardMetric[] = [];
 
-  // --- Ejemplo: total de usuarios activos ---
+  // --- Ejemplo: total de usuarios registrados ---
   try {
-    const activeUsers = await prisma.user.count({
-      where: { role: { not: "INACTIVE" } },
-    });
+    const activeUsers = await prisma.user.count();
     metrics.push({ key: "active_users", value: activeUsers, period });
   } catch (err) {
     console.error("[Board] Error calculando active_users:", err);

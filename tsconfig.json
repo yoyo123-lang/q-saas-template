@@ -39,6 +39,8 @@
     "node_modules",
     "prisma/seed.ts",
     "playwright.config.ts",
-    "tests/e2e/**"
+    "tests/e2e/**",
+    "**/*.test.ts",
+    "**/*.test.tsx"
   ]
 }

@@ -21,10 +21,11 @@ export default defineConfig({
     // { name: "firefox", use: { ...devices["Desktop Firefox"] } },
     // { name: "webkit", use: { ...devices["Desktop Safari"] } },
   ],
+  // globalTeardown: "./tests/e2e/teardown.ts",
   webServer: {
     command: process.env.CI ? "npm start" : "npm run dev",
     url: "http://localhost:3000",
     reuseExistingServer: !process.env.CI,
-    timeout: 30_000,
+    timeout: 60_000,
   },
 });

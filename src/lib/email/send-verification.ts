@@ -1,7 +1,7 @@
 import { createHash, randomUUID } from 'crypto';
 import { render } from '@react-email/components';
 import { prisma } from '@/lib/db';
-import { resend, EMAIL_FROM } from './client';
+import { getResend, EMAIL_FROM } from './client';
 import VerificationEmail from './templates/verification';
 
 interface SendVerificationEmailParams {
@@ -32,7 +32,7 @@ export async function sendVerificationEmail({ userId, email, name }: SendVerific
   const appName = process.env.NEXT_PUBLIC_APP_NAME || 'Q App';
   const html = await render(VerificationEmail({ name, verificationUrl, appName }));
 
-  await resend.emails.send({
+  await getResend().emails.send({
     from: EMAIL_FROM,
     to: email,
     subject: `Verificá tu email — ${process.env.NEXT_PUBLIC_APP_NAME || 'Q App'}`,

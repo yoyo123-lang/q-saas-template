@@ -42,7 +42,6 @@ export function ProfileForm({ initialName, avatarUrl }: ProfileFormProps) {
       {/* Avatar preview (solo lectura) */}
       {avatarUrl && (
         <div className="flex items-center gap-4">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={avatarUrl}
             alt="Avatar"

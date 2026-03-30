@@ -1,5 +1,5 @@
 import { render } from '@react-email/components';
-import { resend, EMAIL_FROM } from './client';
+import { getResend, EMAIL_FROM } from './client';
 import WelcomeEmail from './templates/welcome';
 
 interface SendWelcomeEmailParams {
@@ -18,7 +18,7 @@ export function sendWelcomeEmail({ email, name }: SendWelcomeEmailParams): void 
   const appName = process.env.NEXT_PUBLIC_APP_NAME || 'Q App';
   render(WelcomeEmail({ name, loginUrl, appName }))
     .then((html) =>
-      resend.emails.send({
+      getResend().emails.send({
         from: EMAIL_FROM,
         to: email,
         subject: `Bienvenido/a a ${process.env.NEXT_PUBLIC_APP_NAME || 'Q App'}`,

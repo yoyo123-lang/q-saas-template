@@ -1,9 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { signIn } from "next-auth/react";
 import { z } from "zod";
 import { OAuthButtons } from "./oauth-buttons";
 import { registerUser } from "@/lib/actions/auth";
@@ -23,7 +21,6 @@ const registerSchema = z
 type FieldErrors = Partial<Record<"name" | "email" | "password" | "confirmPassword", string>>;
 
 export function RegisterForm() {
-  const router = useRouter();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");

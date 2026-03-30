@@ -4,14 +4,14 @@
 
 /* =============================================
    Q DESIGN SYSTEM — TOKENS
-   BU: q-saas-template | Accent: #6366F1 (Indigo)
+   BU: q-saas-template | Accent: #2563EB (Azul)
    ============================================= */
 
 @theme {
   /* — Accent (único valor que cambia por BU) — */
-  --color-q-accent: #6366F1;
-  --color-q-accent-light: #818CF8;
-  --color-q-accent-dim: #4F46E5;
+  --color-q-accent: #2563EB;
+  --color-q-accent-light: #3B82F6;
+  --color-q-accent-dim: #1D4ED8;
 
   /* — Navy (compartido, nunca cambia) — */
   --color-q-navy-950: #0B0F1A;

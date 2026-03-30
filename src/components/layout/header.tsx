@@ -2,7 +2,7 @@
 
 import { signOut } from "next-auth/react";
 import { useAuth } from "@/hooks/use-auth";
-import { Menu, LogOut } from "lucide-react";
+import { Menu, LogOut, Search, Bell } from "lucide-react";
 
 interface HeaderProps {
   onMenuClick: () => void;
@@ -19,22 +19,55 @@ export function Header({ onMenuClick }: HeaderProps) {
         borderBottom: "1px solid var(--q-border-light)",
       }}
     >
-      {/* Menu button (mobile) */}
-      <button
-        onClick={onMenuClick}
-        className="rounded-md p-2 transition-colors lg:hidden"
-        style={{ color: "var(--q-text-muted)" }}
-      >
-        <Menu className="h-5 w-5" />
-      </button>
+      {/* Left: menu button (mobile) + search */}
+      <div className="flex items-center gap-3">
+        <button
+          onClick={onMenuClick}
+          className="rounded-md p-2 transition-colors lg:hidden"
+          style={{ color: "var(--q-text-muted)" }}
+        >
+          <Menu className="h-5 w-5" />
+        </button>
 
-      {/* Spacer */}
-      <div className="hidden lg:block" />
+        {/* Search input */}
+        <div className="relative hidden sm:block">
+          <Search
+            className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2"
+            style={{ color: "var(--q-text-disabled)" }}
+          />
+          <input
+            type="search"
+            placeholder="Buscar..."
+            className="h-9 w-56 rounded-md pl-9 pr-3 text-sm outline-none transition-all focus:w-72"
+            style={{
+              backgroundColor: "var(--q-input-bg)",
+              border: "1px solid var(--q-input-border)",
+              color: "var(--q-text-primary)",
+            }}
+            onFocus={(e) => {
+              e.currentTarget.style.border = "2px solid var(--color-q-accent)";
+            }}
+            onBlur={(e) => {
+              e.currentTarget.style.border = "1px solid var(--q-input-border)";
+            }}
+          />
+        </div>
+      </div>
 
-      {/* User info + logout */}
-      <div className="flex items-center gap-4">
+      {/* Right: notifications + user + logout */}
+      <div className="flex items-center gap-3">
+        {/* Notifications */}
+        <button
+          className="relative rounded-md p-2 transition-colors"
+          style={{ color: "var(--q-text-muted)" }}
+          aria-label="Notificaciones"
+        >
+          <Bell className="h-5 w-5" />
+        </button>
+
+        {/* Avatar + name */}
         {user && (
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
             {user.image ? (
               <img
                 src={user.image}
@@ -57,6 +90,8 @@ export function Header({ onMenuClick }: HeaderProps) {
             </span>
           </div>
         )}
+
+        {/* Logout */}
         <button
           onClick={() => signOut({ callbackUrl: "/login" })}
           className="flex items-center gap-2 rounded-md px-3 py-1.5 text-sm transition-colors"

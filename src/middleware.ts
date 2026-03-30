@@ -11,8 +11,8 @@ import type { NextRequest } from "next/server";
  *
  * Modelo de protección completo:
  *   Capa 1 (este middleware) → cookie existe → deja pasar
- *   Capa 2 (dashboard/layout.tsx) → auth() valida sesión contra DB → redirect si inválida
- *   Capa 3 (requireAdmin/requireAuth) → verifica rol para API routes
+ *   Capa 2 (dashboard/layout.tsx) → auth() valida sesión → redirect si inválida
+ *   Capa 3 (requireAuth/requireAdmin/requireTenant) → verifica rol para API routes
  */
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
@@ -21,9 +21,16 @@ export function middleware(request: NextRequest) {
   if (
     pathname === "/" ||
     pathname === "/login" ||
+    pathname === "/register" ||
+    pathname === "/verify-email" ||
+    pathname === "/forgot-password" ||
+    pathname === "/reset-password" ||
     pathname === "/unauthorized" ||
     pathname === "/api/health" ||
     pathname.startsWith("/api/auth") ||
+    pathname.startsWith("/api/cron") ||
+    pathname.startsWith("/api/v1/auth") ||
+    pathname === "/api/v1/directives/receive" ||
     pathname.startsWith("/_next") ||
     pathname.startsWith("/favicon")
   ) {

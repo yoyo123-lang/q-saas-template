@@ -10,34 +10,47 @@ async function main() {
     process.exit(1);
   }
 
-  // Asegurar que el email esté en la allowlist
-  await prisma.allowedEmail.upsert({
-    where: { email: adminEmail },
-    update: {},
-    create: { email: adminEmail },
-  });
+  // Health check de conexión antes de iniciar
+  await prisma.$queryRaw`SELECT 1`;
+  console.log("Conexión a la base de datos: OK");
 
-  console.log(`Email ${adminEmail} en allowlist.`);
+  await prisma.$transaction(async (tx) => {
+    // --- Auth: admin user ---
 
-  // Si el usuario ya existe en DB (ya se logueó antes), promoverlo a ADMIN
-  const existingUser = await prisma.user.findUnique({
-    where: { email: adminEmail },
-    select: { id: true, role: true },
-  });
+    const existingUser = await tx.user.findUnique({
+      where: { email: adminEmail },
+      select: { id: true, role: true, status: true },
+    });
 
-  if (existingUser) {
-    if (existingUser.role !== "ADMIN") {
-      await prisma.user.update({
-        where: { email: adminEmail },
-        data: { role: "ADMIN" },
-      });
-      console.log(`Usuario ${adminEmail} promovido a ADMIN.`);
+    if (existingUser) {
+      const updates: Record<string, unknown> = {};
+      if (existingUser.role !== "ADMIN") updates.role = "ADMIN";
+      if (existingUser.status !== "ACTIVE") {
+        updates.status = "ACTIVE";
+        updates.emailVerified = new Date();
+      }
+      if (Object.keys(updates).length > 0) {
+        await tx.user.update({ where: { email: adminEmail }, data: updates });
+        console.log(`Usuario ${adminEmail} actualizado: ${JSON.stringify(updates)}`);
+      } else {
+        console.log(`Usuario ${adminEmail} ya es ADMIN ACTIVE.`);
+      }
     } else {
-      console.log(`Usuario ${adminEmail} ya es ADMIN.`);
+      // Crear admin sin password — debe configurar acceso vía OAuth o password reset
+      await tx.user.create({
+        data: {
+          email: adminEmail,
+          role: "ADMIN",
+          status: "ACTIVE",
+          emailVerified: new Date(),
+          passwordHash: null,
+        },
+      });
+      console.log(`Usuario admin creado: ${adminEmail} (sin password — configurar vía OAuth o reset).`);
     }
-  } else {
-    console.log(`Usuario ${adminEmail} recibirá rol ADMIN en su primer login.`);
-  }
+  });
+
+  console.log("\nSeed completado.");
 }
 
 main()

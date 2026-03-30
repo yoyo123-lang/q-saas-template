@@ -1,5 +1,6 @@
 import { test as base, type Page } from "@playwright/test";
 import { PrismaClient } from "@prisma/client";
+import { encode } from "@auth/core/jwt";
 
 const prisma = new PrismaClient();
 
@@ -11,7 +12,14 @@ interface TestUser {
   role: "ADMIN" | "USER";
 }
 
-/** Fixture que crea sesión autenticada directamente en DB */
+/**
+ * Fixture que crea sesión autenticada compatible con Auth.js v5 JWT strategy.
+ *
+ * La configuración usa session: { strategy: "jwt" }, lo que significa que:
+ * - La cookie contiene un JWT encriptado (JWE), NO un session token de DB.
+ * - prisma.session nunca se consulta con JWT strategy → no crear sesiones en DB.
+ * - Se crea usuario + org + membership en DB para que los callbacks funcionen.
+ */
 export const test = base.extend<{ authedPage: Page; testUser: TestUser }>({
   // eslint-disable-next-line no-empty-pattern
   testUser: async ({}, use) => {
@@ -25,9 +33,9 @@ export const test = base.extend<{ authedPage: Page; testUser: TestUser }>({
   },
 
   authedPage: async ({ page, testUser }, use) => {
-    const sessionToken = `e2e-session-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    const orgId = `auth-org-${testUser.id}`;
 
-    // Crear usuario en DB
+    // Crear usuario en DB (requerido para jwt callback)
     await prisma.user.create({
       data: {
         id: testUser.id,
@@ -37,21 +45,38 @@ export const test = base.extend<{ authedPage: Page; testUser: TestUser }>({
       },
     });
 
-    // Crear sesión válida en DB (expira en 1 hora)
-    await prisma.session.create({
-      data: {
-        sessionToken,
-        userId: testUser.id,
-        expires: new Date(Date.now() + 60 * 60 * 1000),
-      },
+    // Crear org + membership para que el dashboard cargue
+    await prisma.organization.create({
+      data: { id: orgId, name: "Org E2E", slug: orgId },
+    });
+    await prisma.membership.create({
+      data: { userId: testUser.id, organizationId: orgId, role: "OWNER" },
     });
 
-    // Inyectar cookie de sesión en el browser
-    // NextAuth v5 usa "authjs.session-token" en dev (sin HTTPS)
+    // Crear JWT encriptado tal como lo haría Auth.js v5 con strategy: "jwt"
+    // El salt debe coincidir con el nombre de la cookie (convención de Auth.js v5)
+    const secret = process.env.NEXTAUTH_SECRET ?? "ci-test-secret-not-for-production";
+    const cookieName = "authjs.session-token";
+    const jwtToken = await encode({
+      token: {
+        sub: testUser.id,
+        id: testUser.id,
+        email: testUser.email,
+        name: testUser.name,
+        role: testUser.role,
+        iat: Math.floor(Date.now() / 1000),
+        exp: Math.floor(Date.now() / 1000) + 3600,
+        jti: `e2e-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+      },
+      secret,
+      salt: cookieName,
+    });
+
+    // Inyectar cookie con JWT válido para Auth.js v5
     await page.context().addCookies([
       {
-        name: "authjs.session-token",
-        value: sessionToken,
+        name: cookieName,
+        value: jwtToken,
         domain: "localhost",
         path: "/",
         httpOnly: true,
@@ -61,8 +86,9 @@ export const test = base.extend<{ authedPage: Page; testUser: TestUser }>({
 
     await use(page);
 
-    // Cleanup: eliminar sesión y usuario de test
-    await prisma.session.deleteMany({ where: { userId: testUser.id } });
+    // Cleanup: membership, org y usuario (no hay sesión en DB con JWT strategy)
+    await prisma.membership.deleteMany({ where: { userId: testUser.id } });
+    await prisma.organization.delete({ where: { id: orgId } }).catch(() => {});
     await prisma.user.delete({ where: { id: testUser.id } }).catch(() => {
       // Puede fallar si cascading deletes ya lo eliminaron
     });

@@ -55,19 +55,24 @@ export function DataTable<T>({
 
   return (
     <div>
-      <div className="overflow-x-auto rounded-lg border border-gray-200">
-        <table className="min-w-full divide-y divide-gray-200">
-          <thead className="bg-gray-50">
+      <div
+        className="overflow-x-auto rounded-lg border"
+        style={{ borderColor: "var(--q-border-light)" }}
+      >
+        <table className="min-w-full divide-y" style={{ borderColor: "var(--q-border-light)" }}>
+          <thead style={{ backgroundColor: "var(--q-table-header-bg)" }}>
             <tr>
               {columns.map((col) => (
                 <th
                   key={col.key}
-                  className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500"
+                  className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider"
+                  style={{ color: "var(--q-text-muted)" }}
                 >
                   {col.sortable ? (
                     <button
                       onClick={() => handleSort(col.key)}
-                      className="flex items-center gap-1 hover:text-gray-700"
+                      className="flex items-center gap-1 transition-colors"
+                      style={{ color: "var(--q-text-muted)" }}
                     >
                       {col.label}
                       <ArrowUpDown className="h-3.5 w-3.5" />
@@ -79,23 +84,39 @@ export function DataTable<T>({
               ))}
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-200 bg-white">
+          <tbody>
             {paged.map((item) => (
               <tr
                 key={keyExtractor(item)}
                 onClick={() => onRowClick?.(item)}
-                className={onRowClick ? "cursor-pointer hover:bg-gray-50" : ""}
+                className={onRowClick ? "cursor-pointer transition-colors" : ""}
+                style={{ backgroundColor: "var(--q-surface)", borderBottom: "1px solid var(--q-border-light)" }}
+                onMouseEnter={
+                  onRowClick
+                    ? (e) => {
+                        (e.currentTarget as HTMLTableRowElement).style.backgroundColor =
+                          "var(--q-table-hover)";
+                      }
+                    : undefined
+                }
+                onMouseLeave={
+                  onRowClick
+                    ? (e) => {
+                        (e.currentTarget as HTMLTableRowElement).style.backgroundColor =
+                          "var(--q-surface)";
+                      }
+                    : undefined
+                }
               >
                 {columns.map((col) => (
                   <td
                     key={col.key}
-                    className="whitespace-nowrap px-4 py-3 text-sm text-gray-700"
+                    className="whitespace-nowrap px-4 py-3 text-sm"
+                    style={{ color: "var(--q-text-body)" }}
                   >
                     {col.render
                       ? col.render(item)
-                      : String(
-                          (item as Record<string, unknown>)[col.key] ?? ""
-                        )}
+                      : String((item as Record<string, unknown>)[col.key] ?? "")}
                   </td>
                 ))}
               </tr>
@@ -107,7 +128,7 @@ export function DataTable<T>({
       {/* Paginación */}
       {totalPages > 1 && (
         <div className="mt-4 flex items-center justify-between">
-          <p className="text-sm text-gray-500">
+          <p className="text-sm" style={{ color: "var(--q-text-muted)" }}>
             Mostrando {page * pageSize + 1}–
             {Math.min((page + 1) * pageSize, sorted.length)} de {sorted.length}
           </p>
@@ -115,14 +136,22 @@ export function DataTable<T>({
             <button
               onClick={() => setPage(page - 1)}
               disabled={page === 0}
-              className="rounded-md border border-gray-300 p-1.5 text-gray-500 hover:bg-gray-50 disabled:opacity-50"
+              className="rounded-md border p-1.5 transition-colors disabled:opacity-50"
+              style={{
+                borderColor: "var(--q-border)",
+                color: "var(--q-text-muted)",
+              }}
             >
               <ChevronLeft className="h-4 w-4" />
             </button>
             <button
               onClick={() => setPage(page + 1)}
               disabled={page >= totalPages - 1}
-              className="rounded-md border border-gray-300 p-1.5 text-gray-500 hover:bg-gray-50 disabled:opacity-50"
+              className="rounded-md border p-1.5 transition-colors disabled:opacity-50"
+              style={{
+                borderColor: "var(--q-border)",
+                color: "var(--q-text-muted)",
+              }}
             >
               <ChevronRight className="h-4 w-4" />
             </button>

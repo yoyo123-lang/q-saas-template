@@ -26,14 +26,14 @@ export function Breadcrumbs() {
   });
 
   return (
-    <nav className="flex items-center gap-1 text-sm text-gray-500">
+    <nav className="flex items-center gap-1 text-sm" style={{ color: "var(--q-text-muted)" }}>
       {crumbs.map((crumb, index) => (
         <span key={crumb.href} className="flex items-center gap-1">
           {index > 0 && <ChevronRight className="h-3.5 w-3.5" />}
           {crumb.isLast ? (
-            <span className="font-medium text-gray-900">{crumb.label}</span>
+            <span className="font-medium" style={{ color: "var(--q-text-primary)" }}>{crumb.label}</span>
           ) : (
-            <Link href={crumb.href} className="hover:text-gray-700">
+            <Link href={crumb.href} className="transition-colors hover:underline" style={{ color: "var(--q-text-muted)" }}>
               {crumb.label}
             </Link>
           )}

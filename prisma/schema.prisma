@@ -120,7 +120,86 @@ model OnboardingProgress {
   @@unique([userId, organizationId])
 }
 
-// --- Modelo de ejemplo: Project ---
+// ============================================
+// ONBOARDING MODELS
+// ============================================
+
+enum OnboardingType {
+  BUSINESS   // Org + Fiscal + pasos BU-specific
+  PERSONAL   // Profile + Workspace
+}
+
+model OnboardingProgress {
+  id             String         @id @default(cuid())
+  userId         String
+  organizationId String?
+  type           OnboardingType
+  currentStep    Int            @default(1)
+  totalSteps     Int
+  completedAt    DateTime?
+  data           Json           @default("{}")  // Datos parciales guardados entre pasos
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organization Organization? @relation(fields: [organizationId], references: [id])
+
+  @@unique([userId, organizationId])
+}
+
+// ============================================
+// MULTI-TENANCY
+// ============================================
+
+enum MemberRole {
+  OWNER
+  ADMIN
+  MEMBER
+}
+
+enum OrganizationSector {
+  COMMERCE
+  SERVICES
+  EDUCATION
+  HEALTH
+  MANUFACTURING
+  GASTRONOMY
+  AGRO
+  OTHER
+}
+
+model Organization {
+  id          String             @id @default(cuid())
+  name        String
+  slug        String             @unique
+  fiscalData  Json               @default("{}")
+  settings    Json               @default("{}")
+  sector      OrganizationSector @default(OTHER)
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+
+  memberships        Membership[]
+  onboardingProgress OnboardingProgress[]
+}
+
+model Membership {
+  id             String     @id @default(cuid())
+  userId         String
+  organizationId String
+  role           MemberRole @default(MEMBER)
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, organizationId])
+}
+
+// ============================================
+// MODELO DE EJEMPLO: Project
+// Reemplazá o extendé este modelo con las entidades de tu BU.
+// ============================================
 
 enum ProjectStatus {
   ACTIVE

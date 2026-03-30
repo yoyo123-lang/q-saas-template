@@ -24,3 +24,12 @@ declare module "next-auth/jwt" {
     needsOnboarding?: boolean;
   }
 }
+
+declare module "next-auth/jwt" {
+  interface JWT {
+    userId?: string;
+    role?: string;
+    status?: string;
+    needsOnboarding?: boolean;
+  }
+}

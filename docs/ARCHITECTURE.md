@@ -160,7 +160,63 @@ Definidas en `.env.example`:
 | GOOGLE_CLIENT_SECRET | OAuth client secret | Sí |
 | ADMIN_EMAIL | Email del admin (seed + auto-promoción a ADMIN en primer login) | Sí |
 
-## 6) Restricciones conocidas
+## 6) Autenticación y Onboarding
+
+### 6.1 Flujo de autenticación
+
+```text
+[Usuario] → /login
+  → Google OAuth → /api/auth/callback/google → signIn callback → JWT
+  → Email/Password → /api/auth/callback/credentials → authorize() → JWT
+
+[JWT callback] → carga role + status + needsOnboarding en el token
+[Session callback] → expone role + status + needsOnboarding en session.user
+```
+
+### 6.2 Modelo de protección de rutas (3 capas)
+
+| Capa | Archivo | Qué verifica | Toca DB? |
+|---|---|---|---|
+| 1. Middleware | `src/middleware.ts` | Cookie de sesión existe | No (Edge Runtime) |
+| 2. Layout | `src/app/dashboard/layout.tsx` | Sesión válida via `auth()` | Sí |
+| 3. Guards | `src/lib/auth/guards.ts` | Sesión + rol + org | Sí |
+
+**Guards disponibles:** `requireAuth`, `requireAdmin`, `requireOrg`, `requireTenant`
+
+### 6.3 Flujo de onboarding
+
+```text
+[Post-login] → needsOnboarding flag en JWT
+  → /onboarding → TypeSelector (BUSINESS / PERSONAL)
+    BUSINESS: organization → fiscal-data → [pasos BU-specific] → dashboard
+    PERSONAL: profile → workspace → dashboard
+```
+
+**Configurar en:** `src/config/onboarding.config.ts`
+
+**Pasos universales (no modificar):** `organization`, `fiscal-data`
+**Pasos BU-specific (personalizar):** ver `example-step` como referencia
+
+### 6.4 Sync Cross-BU
+
+```text
+[Usuario activa cuenta] → syncUserToBoard() → POST /api/v1/auth/sync (Q-Company)
+[Q-Company crea usuario en BU] → POST /api/v1/auth/user-provision → User INACTIVE
+[Usuario INACTIVE hace OAuth] → signIn callback → activa usuario + notifyUserActivated()
+```
+
+**Archivos clave:**
+- `src/lib/sync/user-sync.ts` — sync a Q-Company (fire-and-forget)
+- `src/lib/sync/hmac.ts` — verificación HMAC para webhooks
+- `src/app/api/v1/auth/user-provision/route.ts` — receptor de provisioning
+
+### 6.5 Referencias
+
+- Setup completo: `docs/AUTH-SETUP.md`
+- Variables de entorno: `.env.example`
+- Configuración: `src/config/onboarding.config.ts`, `src/lib/auth/config.ts`
+
+## 7) Restricciones conocidas
 
 - Formato argentino obligatorio: números (1.000,50), fechas (DD/MM/AAAA)
 - Español argentino en toda la UI

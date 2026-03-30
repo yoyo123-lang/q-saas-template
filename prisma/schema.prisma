@@ -8,41 +8,58 @@ datasource db {
   directUrl = env("DIRECT_URL")
 }
 
-// --- Auth (NextAuth v5) ---
+// ============================================
+// AUTH MODELS
+// ============================================
 
 enum Role {
   ADMIN
   USER
 }
 
+enum UserStatus {
+  PENDING_VERIFICATION  // Email no verificado (registro con credentials)
+  ACTIVE                // Verificado y activo
+  INACTIVE              // Creado por sync cross-BU, aún no activó en esta BU
+  SUSPENDED             // Suspendido por admin
+}
+
 model User {
-  id            String    @id @default(cuid())
-  name          String?
-  email         String?   @unique
-  emailVerified DateTime?
-  image         String?
-  role          Role      @default(USER)
-  accounts      Account[]
-  sessions      Session[]
-  projects      Project[]
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  id              String     @id @default(cuid())
+  email           String     @unique
+  name            String?
+  image           String?
+  emailVerified   DateTime?
+  passwordHash    String?    // bcrypt hash, null si solo usa OAuth
+  role            Role       @default(USER)
+  status          UserStatus @default(PENDING_VERIFICATION)
+  globalUserId    String?    // ID en Q-Company GlobalUser registry (sync)
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+
+  accounts                Account[]
+  sessions                Session[]
+  memberships             Membership[]
+  emailVerificationTokens EmailVerificationToken[]
+  onboardingProgress      OnboardingProgress[]
+  projects                Project[]
 }
 
 model Account {
   id                String  @id @default(cuid())
   userId            String
-  type              String
-  provider          String
+  type              String  // "oauth" | "credentials"
+  provider          String  // "google" | "microsoft" | etc.
   providerAccountId String
-  refresh_token     String? @db.Text
-  access_token      String? @db.Text
+  refresh_token     String?
+  access_token      String?
   expires_at        Int?
   token_type        String?
   scope             String?
-  id_token          String? @db.Text
+  id_token          String?
   session_state     String?
-  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([provider, providerAccountId])
 }
@@ -52,21 +69,55 @@ model Session {
   sessionToken String   @unique
   userId       String
   expires      DateTime
-  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
-model VerificationToken {
-  identifier String
-  token      String   @unique
-  expires    DateTime
-
-  @@unique([identifier, token])
-}
-
-model AllowedEmail {
+model EmailVerificationToken {
   id        String   @id @default(cuid())
-  email     String   @unique
+  tokenHash String   @unique  // SHA-256 hash del token real
+  userId    String
+  expires   DateTime
+  used      Boolean  @default(false)
   createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model PasswordResetToken {
+  id        String   @id @default(cuid())
+  tokenHash String   @unique  // SHA-256 hash del token real
+  email     String
+  expires   DateTime
+  used      Boolean  @default(false)
+  createdAt DateTime @default(now())
+}
+
+// ============================================
+// ONBOARDING MODELS
+// ============================================
+
+enum OnboardingType {
+  BUSINESS   // Org + Fiscal + pasos BU-specific
+  PERSONAL   // Profile + Workspace
+}
+
+model OnboardingProgress {
+  id             String         @id @default(cuid())
+  userId         String
+  organizationId String?
+  type           OnboardingType
+  currentStep    Int            @default(1)
+  totalSteps     Int
+  completedAt    DateTime?
+  data           Json           @default("{}")  // Datos parciales guardados entre pasos
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organization Organization? @relation(fields: [organizationId], references: [id])
+
+  @@unique([userId, organizationId])
 }
 
 // --- Modelo de ejemplo: Project ---
@@ -92,4 +143,54 @@ model Project {
   @@index([userId])
   @@index([status])
   @@index([userId, deletedAt, createdAt])
+}
+
+// --- Multi-tenancy ---
+
+enum MemberRole {
+  OWNER
+  ADMIN
+  MEMBER
+}
+
+enum OrganizationSector {
+  COMMERCE
+  SERVICES
+  EDUCATION
+  HEALTH
+  MANUFACTURING
+  GASTRONOMY
+  AGRO
+  OTHER
+}
+
+model Organization {
+  id             String             @id @default(cuid())
+  name           String
+  slug           String             @unique
+  fiscalData     Json               @default("{}")
+  settings       Json               @default("{}")
+  sector         OrganizationSector @default(OTHER)
+  enabledModules Json?
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+
+  memberships        Membership[]
+  onboardingProgress OnboardingProgress[]
+}
+
+model Membership {
+  id             String     @id @default(cuid())
+  userId         String
+  organizationId String
+  role           MemberRole @default(MEMBER)
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, organizationId])
+  @@index([userId])
+  @@index([organizationId])
 }

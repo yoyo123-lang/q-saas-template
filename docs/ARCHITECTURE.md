@@ -160,7 +160,66 @@ Definidas en `.env.example`:
 | GOOGLE_CLIENT_SECRET | OAuth client secret | Sí |
 | ADMIN_EMAIL | Email del admin (seed + auto-promoción a ADMIN en primer login) | Sí |
 
-## 6) Restricciones conocidas
+## 6) Auth y Onboarding
+
+### 6.1 Stack de auth
+- NextAuth v5 (Auth.js) con JWT strategy
+- Google OAuth + Email/Password con bcryptjs
+- Resend para emails transaccionales (verificación, reset, bienvenida)
+- Prisma Adapter con workaround para `allowDangerousEmailAccountLinking` (ver `src/lib/auth/adapter.ts`)
+
+### 6.2 Modelo de protección (3 capas)
+
+| Capa | Archivo | Qué verifica | Edge Runtime |
+|---|---|---|---|
+| 1. Middleware | `src/middleware.ts` | Cookie de sesión existe | Sí (sin DB) |
+| 2. Dashboard layout | `src/app/dashboard/layout.tsx` | Sesión válida con `auth()` | No |
+| 3. API/guards | `src/lib/auth/guards.ts` | Auth + rol + tenant | No |
+
+Guards disponibles: `requireAuth()`, `requireAdmin()`, `requireOrg()`, `requireTenant()`
+
+### 6.3 Módulos auth
+
+| Archivo | Responsabilidad |
+|---|---|
+| `src/lib/auth/config.ts` | Configuración NextAuth, export de `auth`, `handlers`, `signIn`, `signOut` |
+| `src/lib/auth/providers.ts` | Google OAuth + Credentials |
+| `src/lib/auth/callbacks.ts` | JWT/session callbacks, sync cross-BU en signIn |
+| `src/lib/auth/adapter.ts` | PrismaAdapter con workaround para email linking |
+| `src/lib/auth/guards.ts` | Helpers para proteger API routes |
+
+### 6.4 Flujo de onboarding
+
+```text
+/onboarding (type selector)
+    ↓
+[BUSINESS]                      [PERSONAL]
+/onboarding/organization        /onboarding/profile
+    ↓                               ↓
+/onboarding/fiscal-data         /onboarding/workspace
+    ↓                               ↓
+[BU-specific steps]             → /dashboard
+    ↓
+→ /dashboard
+```
+
+Configuración en `src/config/onboarding.config.ts`:
+- `businessSteps`: 2 universales (org + fiscal) + BU-specific comentados como ejemplo
+- `personalSteps`: profile + workspace (fijo)
+- `allowedTypes`: BUSINESS / PERSONAL / ambos
+
+### 6.5 Cross-BU sync
+- Al registrarse: esta BU notifica a Q-Company `POST /api/v1/auth/sync`
+- Q-Company propaga el usuario como INACTIVE a otras BUs
+- Esta BU recibe usuarios entrantes en `POST /api/v1/auth/user-provision` (autenticado con HMAC)
+- Módulo: `src/lib/sync/user-sync.ts` + `hmac.ts`
+
+### 6.6 Variables clave auth
+`AUTH_SECRET`, `ADMIN_EMAIL`, `NEXT_PUBLIC_APP_URL`, `NEXT_PUBLIC_APP_NAME`,
+`GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `RESEND_API_KEY`, `EMAIL_FROM`,
+`BU_SLUG`, `BOARD_URL`, `BOARD_API_KEY`, `BOARD_WEBHOOK_SECRET`
+
+## 7) Restricciones conocidas
 
 - Formato argentino obligatorio: números (1.000,50), fechas (DD/MM/AAAA)
 - Español argentino en toda la UI

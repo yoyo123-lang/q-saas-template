@@ -62,6 +62,12 @@
 - **Referencia visual**: [URL de un sitio que te guste como se ve, o "ninguna"]
 - **Estilo en 3 palabras**: [ej: "profesional, limpio, serio" o "moderno, colorido, amigable"]
 
+## 6. Autenticación y Onboarding
+- ¿Qué tipo de onboarding necesita tu BU? (empresarial / personal / ambos)
+- ¿Qué pasos adicionales de onboarding necesita tu BU? (describir brevemente)
+  Ejemplos: ERP → Primer producto. CRM → Canales de comunicación. Job Board → Primera oferta.
+- ¿Necesita roles adicionales además de ADMIN/USER? (describir)
+
 ## Notas adicionales
 
 [Cualquier cosa que Claude Code deba saber antes de arrancar — restricciones, decisiones ya tomadas, cosas que no querés]

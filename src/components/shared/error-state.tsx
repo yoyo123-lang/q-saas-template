@@ -16,13 +16,18 @@ export function ErrorState({
 }: ErrorStateProps) {
   return (
     <div className={cn("flex flex-col items-center justify-center py-12", className)}>
-      <AlertTriangle className="h-12 w-12 text-red-400" />
-      <h3 className="mt-4 text-sm font-semibold text-gray-900">{title}</h3>
-      <p className="mt-1 text-sm text-gray-500">{message}</p>
+      <AlertTriangle className="h-12 w-12" style={{ color: "var(--color-q-error)" }} />
+      <h3 className="mt-4 text-sm font-semibold" style={{ color: "var(--q-text-primary)" }}>
+        {title}
+      </h3>
+      <p className="mt-1 text-sm" style={{ color: "var(--q-text-muted)" }}>
+        {message}
+      </p>
       {onRetry && (
         <button
           onClick={onRetry}
-          className="mt-4 rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-gray-800"
+          className="mt-4 rounded-md px-4 py-2 text-sm font-medium text-white transition-colors"
+          style={{ backgroundColor: "var(--color-q-accent)" }}
         >
           Reintentar
         </button>

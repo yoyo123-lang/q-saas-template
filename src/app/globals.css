@@ -1,1 +1,83 @@
 @import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  /* ── Accent (Amber — Qapitaliza) ── */
+  --color-q-accent: #F59E0B;
+  --color-q-accent-light: #FBBF24;
+  --color-q-accent-dim: #D97706;
+
+  /* ── Navy palette ── */
+  --color-q-navy-900: #0F172A;
+  --color-q-navy-800: #1E293B;
+  --color-q-navy-700: #334155;
+  --color-q-navy-600: #475569;
+
+  /* ── Gray palette ── */
+  --color-q-gray-100: #F1F5F9;
+  --color-q-gray-200: #E2E8F0;
+  --color-q-gray-300: #CBD5E1;
+  --color-q-gray-400: #94A3B8;
+  --color-q-gray-500: #64748B;
+  --color-q-gray-600: #475569;
+
+  /* ── Status colors ── */
+  --color-q-success: #22C55E;
+  --color-q-warning: #EAB308;
+  --color-q-error: #EF4444;
+  --color-q-info: #3B82F6;
+
+  /* ── Font ── */
+  --font-sans: 'Inter', ui-sans-serif, system-ui, -apple-system, sans-serif;
+
+  /* ── Border radius ── */
+  --radius-sm: 0.375rem;
+  --radius-md: 0.5rem;
+  --radius-lg: 0.75rem;
+  --radius-xl: 1rem;
+}
+
+/* ── Light mode semantic tokens ── */
+:root {
+  --q-bg: #FFFFFF;
+  --q-bg-secondary: #F8FAFC;
+  --q-bg-tertiary: #F1F5F9;
+  --q-surface: #FFFFFF;
+  --q-surface-hover: #F8FAFC;
+  --q-border: #E2E8F0;
+  --q-border-strong: #CBD5E1;
+  --q-text-primary: #0F172A;
+  --q-text-body: #334155;
+  --q-text-secondary: #64748B;
+  --q-text-muted: #94A3B8;
+  --q-text-on-accent: #FFFFFF;
+  --q-accent: #F59E0B;
+  --q-accent-hover: #D97706;
+  --q-accent-subtle: #FEF3C7;
+}
+
+/* ── Dark mode semantic tokens ── */
+.dark {
+  --q-bg: #0F172A;
+  --q-bg-secondary: #1E293B;
+  --q-bg-tertiary: #334155;
+  --q-surface: #1E293B;
+  --q-surface-hover: #334155;
+  --q-border: #334155;
+  --q-border-strong: #475569;
+  --q-text-primary: #F1F5F9;
+  --q-text-body: #CBD5E1;
+  --q-text-secondary: #94A3B8;
+  --q-text-muted: #64748B;
+  --q-text-on-accent: #0F172A;
+  --q-accent: #FBBF24;
+  --q-accent-hover: #F59E0B;
+  --q-accent-subtle: #451A03;
+}
+
+body {
+  background-color: var(--q-bg);
+  color: var(--q-text-primary);
+  font-family: var(--font-sans);
+}

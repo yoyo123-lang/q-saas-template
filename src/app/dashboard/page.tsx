@@ -27,7 +27,7 @@ const STAT_CARDS = [
   { key: "total" as const, label: "Total", icon: FolderKanban, color: "text-gray-600", bg: "bg-gray-50" },
   { key: "active" as const, label: "Activos", icon: FolderKanban, color: "text-green-600", bg: "bg-green-50" },
   { key: "paused" as const, label: "Pausados", icon: Pause, color: "text-yellow-600", bg: "bg-yellow-50" },
-  { key: "completed" as const, label: "Completados", icon: CheckCircle, color: "text-blue-600", bg: "bg-blue-50" },
+  { key: "completed" as const, label: "Completados", icon: CheckCircle, color: "text-[var(--color-q-accent)]", bg: "bg-[var(--color-q-accent-light)]/10" },
   { key: "archived" as const, label: "Archivados", icon: Archive, color: "text-gray-400", bg: "bg-gray-50" },
 ];
 

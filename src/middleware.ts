@@ -21,9 +21,16 @@ export function middleware(request: NextRequest) {
   if (
     pathname === "/" ||
     pathname === "/login" ||
+    pathname === "/register" ||
+    pathname === "/verify-email" ||
+    pathname === "/forgot-password" ||
+    pathname === "/reset-password" ||
     pathname === "/unauthorized" ||
     pathname === "/api/health" ||
     pathname.startsWith("/api/auth") ||
+    pathname.startsWith("/api/cron") ||
+    pathname.startsWith("/api/v1/auth") ||
+    pathname === "/api/v1/directives/receive" ||
     pathname.startsWith("/_next") ||
     pathname.startsWith("/favicon")
   ) {

@@ -1,0 +1,32 @@
+# Supabase Keep-Alive
+# Ejecuta un SELECT 1 cada 3 días para evitar que Supabase pause
+# el proyecto por inactividad (free tier pausa después de 7 días).
+#
+# Requisito: configurar el secret SUPABASE_DB_URL en el repo.
+# Usar la connection string DIRECTA (no pooled), ejemplo:
+#   postgresql://postgres.[ref]:[password]@aws-0-[region].pooler.supabase.com:5432/postgres
+#
+# También se puede ejecutar manualmente desde la pestaña Actions.
+
+name: Supabase Keep-Alive
+
+on:
+  schedule:
+    # Cada 3 días a las 06:00 UTC
+    - cron: "0 6 */3 * *"
+  workflow_dispatch:
+
+jobs:
+  keepalive:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Ping Supabase DB
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          if [ -z "$SUPABASE_DB_URL" ]; then
+            echo "::warning::SUPABASE_DB_URL secret not configured. Skipping."
+            exit 0
+          fi
+          psql "$SUPABASE_DB_URL" -c "SELECT 1 AS keepalive;" && echo "Supabase ping OK" || echo "::warning::Ping failed"

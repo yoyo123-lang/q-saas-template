@@ -102,6 +102,7 @@ Si el proyecto tiene hooks configurados → ver `docs/HOOKS.md`. Los hooks corre
 - Para implementar un cambio con revisión automática: `/project:cambio`
 - Para cambios grandes multi-etapa: `/project:cambio-grande`
 - Para correr revisión de roles a demanda: `/project:revision`
+- Para auditar el MCP tool registry: `/project:registry-audit`
 - Para debugging estructurado: `/project:debug`
 - Para generar tests e2e automáticamente: `/project:e2e`
 - Para verificar y pushear a producción: `/project:deploy`
@@ -122,6 +123,39 @@ Cuando enfrentes un problema complejo, usá "ultrathink" para activar razonamien
 - Decisiones que afecten la arquitectura
 - Debugging de problemas difíciles de reproducir
 - Cualquier cambio que toque más de 5 archivos
+
+## MCP Tool Registry
+
+Esta BU mantiene un **registro tipado de todas sus funciones** en `src/lib/mcp/registry.ts`.
+El registry es la fuente única de verdad para MCP server, Setup Guide, y compliance.
+
+**Archivos clave:**
+- `src/lib/mcp/types.ts` — tipos compartidos del ecosistema Q Company
+- `src/lib/mcp/registry.ts` — registro de funciones por dominio
+- `scripts/check-registry-sync.js` — hook pre-commit que valida sync
+- `docs/MCP_TOOL_REGISTRY_PROTOCOL.md` — protocolo normativo
+
+**Reglas:**
+- Toda función exportada en `src/lib/actions/` o `src/lib/services/` DEBE tener una entrada en el registry
+- Si la función es un helper interno, prefijala con `_` para excluirla del check
+- Incrementar `version` en el registry después de cada cambio significativo
+- Evaluar `mcpReadiness` de cada función nueva: `ready`, `needs_extraction`, `needs_schema`, o `not_started`
+- Para auditar el estado del registry: `/project:registry-audit`
+
+**Flujo:**
+```
+Nueva función → Registrar en registry.ts → Pre-commit valida → CI (q-company) verifica compliance
+```
+
+## Handoff Plan
+
+Este proyecto mantiene un `HANDOFF_PLAN.md` con 7 fases para dejar el proyecto listo para handoff.
+
+**Reglas:**
+- Cuando completes una tarea del plan, marcá el checkbox: `- [ ]` → `- [x]`
+- Si creás archivos mencionados en el plan, verificá que coincidan con lo esperado
+- Si descubrís deuda técnica nueva, agregala a la fase correspondiente
+- Nunca borres items del plan — si no aplican, marcalos como `- [x] ~~item~~ (N/A: razón)`
 
 ## Conexión con Q Company Board
 

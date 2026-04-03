@@ -1,0 +1,26 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo $CLAUDE_FILE_PATH | grep -qE '(supabase/migrations/|\\.env$|\\.env\\.local$|package-lock\\.json$|\\.lock$)' && echo 'ARCHIVO PROTEGIDO: no editar directamente. Para migraciones: crear un nuevo archivo. Para .env: editar .env.example.' && exit 2 || exit 0"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "npx prettier --write $CLAUDE_FILE_PATH 2>/dev/null || true"
+          }
+        ]
+      }
+    ]
+  }
+}

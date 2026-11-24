@@ -27,21 +27,18 @@
     "@radix-ui/react-tooltip": "^1.2.8",
     "@react-email/components": "^1.0.10",
     "@types/bcryptjs": "^2.4.6",
-    "bcryptjs": "^3.0.3",
+    "bcryptjs": "^2.4.3",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "lucide-react": "^0.577.0",
-    "next": "^15.3.3",
+    "next": "15.5.29",
     "next-auth": "^5.0.0-beta.30",
     "prisma": "^6.19.2",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
     "resend": "^6.10.0",
     "tailwind-merge": "^3.5.0",
-    "zod": "^3.25.67",
-    "resend": "^6.10.0",
-    "@react-email/components": "^1.0.10",
-    "bcryptjs": "^2.4.3"
+    "zod": "^3.25.67"
   },
   "devDependencies": {
     "@playwright/test": "^1.58.2",
@@ -59,5 +56,8 @@
     "typescript": "^5.9.3",
     "typescript-eslint": "^8.37.0",
     "vitest": "^4.1.0"
+  },
+  "overrides": {
+    "effect": "3.22.1"
   }
 }
